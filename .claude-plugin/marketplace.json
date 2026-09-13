@@ -1,12 +1,12 @@
 {
-  "name": "uidiff",
+  "name": "devrevtools",
   "owner": {
     "name": "Sai Im"
   },
   "plugins": [
     {
       "name": "uidiff",
-      "source": "./",
+      "source": "./plugins/uidiff",
       "description": "Before/after UI screenshots and pixel-accurate diffs for a local dev server."
     }
   ]

@@ -8,8 +8,8 @@ actually useful — this file is just the mechanics.
 No install step: the tool has zero runtime dependencies.
 
 ```bash
-git clone https://github.com/imsain/uidiff.git
-cd uidiff
+git clone https://github.com/imsain/DevRevTools.git
+cd DevRevTools/plugins/uidiff
 node --test test/*.test.mjs
 ```
 
