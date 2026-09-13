@@ -54,6 +54,7 @@ import {
 import { numberFlag, parseArgs } from '../lib/args.mjs';
 import { initConfig } from '../lib/init.mjs';
 import { buildMarkdown } from '../lib/markdown.mjs';
+import { buildCanvasCode, writeCanvas } from '../lib/canvas.mjs';
 import { wipeGif } from '../lib/wipe.mjs';
 import { buildRules, classifyChange } from '../lib/visual.mjs';
 
@@ -543,6 +544,41 @@ async function commandMarkdown(root, config, args) {
   console.log(markdown);
 }
 
+async function commandCanvas(root, config, args) {
+  const path = args.positional[1];
+  targetUrl(config, path);
+  const dir = outDir(root, slugFor(path));
+  const beforeFile = join(dir, 'before.png');
+  const afterFile = join(dir, 'after.png');
+  if (!existsSync(beforeFile) || !existsSync(afterFile)) {
+    throw new UiDiffError(
+      `no captures for ${path}. Run ` +
+        `"uidiff compare ${path} --before-ref HEAD" first.`
+    );
+  }
+  const run = readJson(join(dir, 'run.json'), {});
+
+  const pairs = [];
+  for (const region of hasImageMagick() ? (run.regions ?? []) : []) {
+    const before = join(dir, `${region.name}-before.png`);
+    const after = join(dir, `${region.name}-after.png`);
+    if (existsSync(before) && existsSync(after)) {
+      pairs.push({ label: region.label, before, after });
+    }
+  }
+  pairs.push({ label: pairs.length ? 'Full page' : 'Viewport', before: beforeFile, after: afterFile });
+
+  const code = buildCanvasCode({
+    target: run.target ?? path,
+    meta: run.meta ?? `${projectName(root)} · ${targetUrl(config, path)}`,
+    metric: run.metric ?? pixelDiff(beforeFile, afterFile),
+    pairs
+  });
+  const file = writeCanvas(root, `uidiff-${projectName(root)}-${slugFor(path)}`, code);
+  console.log(`canvas: ${file}`);
+  console.log('Open it beside the chat to compare before/after with the drag slider.');
+}
+
 /**
  * Writes the one file a new repo needs. Deliberately says what it detected and
  * how sure it is: a baseUrl inferred from a framework default is a good guess
@@ -611,6 +647,8 @@ const HELP = `uidiff — before/after UI screenshots for a local dev server
   uidiff doctor                      check config, chrome, dev server, auth
   uidiff compare <path> [--before-ref <ref>]
   uidiff markdown <path> [--no-open]
+  uidiff canvas <path>                open the drag-slider compare beside the
+                                     chat, instead of a browser tab
   uidiff restore                     undo an interrupted --before-ref swap
   uidiff install-deps                brew install imagemagick, with consent
 
@@ -702,6 +740,9 @@ async function main() {
       return;
     case 'markdown':
       await commandMarkdown(root, config, args);
+      return;
+    case 'canvas':
+      await commandCanvas(root, config, args);
       return;
     default:
       throw new UiDiffError(`Unknown command: ${command}\n\n${HELP}`);

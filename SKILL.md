@@ -289,7 +289,23 @@ It also means no `gh` CLI and no network access are needed to produce the body.
 The moving comparison is an animated GIF because a slider cannot survive in
 markdown — GitHub strips `<script>`, `<input type="range">` and `data:` image
 sources. For the real drag-to-compare slider, open the HTML report from
-`compare`.
+`compare`, or run `uidiff canvas <path>` to get the same slider as a Cursor
+Canvas the user can open beside the chat instead of a browser tab — nicer
+when the review is happening in Cursor rather than on a PR.
+
+## Showing it beside the chat instead of a browser tab
+
+```bash
+uidiff canvas /dashboard
+```
+
+Reads the captures a prior `compare` run left behind (same rule as
+`markdown`: run `compare` first, this does not re-open the page) and writes a
+`.canvas.tsx` with a live drag-to-compare slider per region, embedding the
+images so the canvas needs no server. Link the printed path so the user can
+open it: `[Compare](/absolute/path/to/uidiff-....canvas.tsx)`. Prefer this
+over `openInBrowser`'s HTML report when the user is working inside Cursor —
+it's the same interaction without leaving the editor.
 
 ## Other commands
 

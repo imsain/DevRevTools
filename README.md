@@ -135,6 +135,7 @@ overlay as a result.
 uidiff init                               # one-off, per repo
 uidiff compare /dashboard                 # working tree vs HEAD, then a report
 uidiff markdown /dashboard                # PR body on the clipboard + images to drag in
+uidiff canvas /dashboard                  # same drag slider, as a Cursor Canvas beside the chat
 ```
 
 `compare` captures the current state, restores the changed files to
