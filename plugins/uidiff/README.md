@@ -1,0 +1,225 @@
+# uidiff — before/after UI screenshots
+
+Captures a page on your local dev server before and after a code change, and
+produces a drag-to-compare HTML report plus the `getBoundingClientRect()`
+numbers for whichever elements you name. `SKILL.md` next to this file is the
+agent-facing version; this one is for setting it up on your machine.
+
+Any route, any change, nothing to configure per screen: the page and the
+interactions to reach a state are command-line arguments. It also refuses to
+capture a change that could not possibly look different, so a docs-only or
+test-only edit does not cost you two screenshots and a shrug.
+
+## Scope
+
+This is deliberately narrow, and says so up front rather than half-supporting
+things:
+
+- **macOS only.** It opens the report with `open`, copies the PR body with
+  `pbcopy`, and reveals images with `open -R`. On anything else it stops with
+  one clear line instead of failing halfway through a run.
+- **Built for a JavaScript front end** with a dev server that hot-reloads —
+  Next.js, Vite and the like. The wait after a file swap is a plain sleep, so a
+  stack that has to compile before it serves would photograph the old build.
+- **Sign-in is either a next-auth app or a cookie you supply yourself.**
+
+None of that is deep in the design; it is where the tool has actually been
+used. See "Contributing" below.
+
+## What you need on your machine
+
+- **Node 21 or newer.** The tool has no dependencies — it uses the global
+  `fetch` and `WebSocket` that Node 21 added, and drives Chrome directly over
+  the DevTools Protocol rather than through Puppeteer.
+- **Chrome or Chromium.** Found automatically in `/Applications`. Set
+  `CHROME_PATH`, or `chromePath` in the config, if yours is elsewhere.
+- **git.** The "before" frame is rebuilt by swapping files on disk to a ref.
+- **ImageMagick** — the only thing you may not already have. You do not need to
+  install it up front: `compare` stops if it is missing and offers
+  `uidiff install-deps`, which is `brew install imagemagick` and nothing else.
+  Declining is fine — `--skip-crops` gives you the full-page pair without the
+  crops, the pixel-diff count or the wipe animation.
+
+## Installing it
+
+**As a Cursor plugin, from the IDE.** Paste this repository's URL into the
+plugin search in Cursor (Customize → Plugins) and install it. The agent-facing
+`SKILL.md` and the CLI arrive together, and the agent resolves the CLI out of
+the installed plugin directory, so there is nothing to put on your `PATH` and
+nothing to vendor into the repo you want to capture. To hand it to a whole
+team at once, point Dashboard → Plugins → Team Marketplaces at the repository
+instead; note that marketplace plugins are not auto-updated from source, so a
+new version needs a re-index.
+
+**As a Cursor plugin, from the CLI.** `cursor-agent` manages plugins through
+marketplaces rather than installing a URL directly:
+
+```bash
+cursor-agent plugin marketplace add https://github.com/imsain/DevRevTools
+```
+
+Then, in an interactive `cursor-agent` session, `/plugin` (or `/plugins`)
+lists `uidiff` under that marketplace and installs it at user or project
+scope.
+
+> **If a plugin search or a previous `marketplace add` reports no plugin
+> found**, it likely registered a marketplace before this repository had a
+> `.cursor-plugin/marketplace.json`, or against an old commit. `cursor-agent
+> plugin marketplace list` shows every marketplace registered under this
+> name or URL — a duplicate is common, since pasting the URL into IDE search
+> and running `marketplace add` in the CLI can each register their own entry.
+> `marketplace update <name>` does **not** reliably fix an entry stuck at
+> zero plugins; remove it and add it again:
+>
+> ```bash
+> cursor-agent plugin marketplace remove <stale-name>
+> cursor-agent plugin marketplace add https://github.com/imsain/DevRevTools
+> ```
+
+**As a Claude Code plugin.** This repository is also a Claude Code plugin
+marketplace (`.claude-plugin/marketplace.json` alongside the Cursor one), with
+the same `SKILL.md` and CLI:
+
+```bash
+claude plugin marketplace add imsain/DevRevTools
+claude plugin install uidiff
+```
+
+`claude plugin details uidiff` confirms the skill registered correctly.
+
+**On the command line, without either plugin system.** Clone it anywhere and
+either link it or wrap it:
+
+```bash
+git clone https://github.com/imsain/DevRevTools && cd DevRevTools/plugins/uidiff && npm link
+# or, without npm:
+uidiff() { node /path/to/DevRevTools/plugins/uidiff/bin/uidiff.mjs "$@"; }
+```
+
+`$UIDIFF_BIN` overrides where the skill looks, if you want a checkout of your
+own to win over an installed plugin.
+
+## Setting it up for a repo
+
+Each repo you capture needs one `.uidiff.json` at its root, holding its dev
+server URL and how to sign in. `uidiff init` writes it:
+
+```bash
+cd your-repo
+uidiff init
+uidiff doctor
+```
+
+`init` reads the checkout — the front end's `package.json` even when it is
+buried in a monorepo, the port named in its dev script, the framework's default
+port otherwise, and whether it uses an Auth.js version that can be signed
+offline — then prints what it detected and how confident it was. Treat a port
+it inferred from a framework default as a guess until `doctor` confirms it.
+
+`doctor` prints config, viewport, ImageMagick, Chrome, dev server and auth in
+seven lines, and is the right first move whenever something looks wrong.
+
+That config is the whole configuration, it holds per-repo settings only, and it
+is meant to be committed. `config.example.json` documents every key it can
+take; `init` writes only the two that have no sensible default.
+
+Start your dev server yourself; the tool never starts one and won't fight one
+you already have. **If your pages fetch from a separate API, start that too** —
+a route whose backend is down still produces a PNG, of an error page. Every
+command warns when that has happened rather than letting you read an error
+overlay as a result.
+
+## Using it
+
+```bash
+uidiff init                               # one-off, per repo
+uidiff compare /dashboard                 # working tree vs HEAD, then a report
+uidiff markdown /dashboard                # PR body on the clipboard + images to drag in
+uidiff canvas /dashboard                  # same drag slider, as a Cursor Canvas beside the chat
+```
+
+`compare` captures the current state, restores the changed files to
+`--before-ref` (`HEAD` by default), waits for the dev server to reload,
+captures again, then restores your working tree verbatim — uncommitted work
+included. If it is ever interrupted mid-swap, `uidiff restore` puts the files
+back and `doctor` warns you that a swap is pending.
+
+To reach a particular state, add `--wait-for`, `--click`, `--hover` and
+`--wait`; they apply in the order you write them and each can repeat. Add
+`--measure <selector>` for the geometry of an element and `--crop <selector>`
+to compare one region closely — the crop region is computed from that element's
+live position, so you never work out pixel coordinates yourself. `--mask
+<selector>` paints a region flat in both frames, which is how you stop a clock
+or a rotating avatar from counting as a difference. `uidiff --help` lists
+everything.
+
+For a PR, `markdown` puts the body on your clipboard and opens Finder with the
+images selected — paste, then drag each image onto its `> Drop ….gif on this
+line.` slot. The images go to GitHub's own attachment store, so nothing is
+committed to the repo.
+
+## Two things worth knowing about the numbers
+
+**The pixel count is an exact count of pixels that differ in any channel.** It
+is deliberately not ImageMagick's `-metric AE`, which sounds like exactly that
+but reports a normalised sum of channel errors on a Q16 HDRI build — the one
+Homebrew installs. On a test pair with twelve solidly repainted pixels it says
+`8.47`, and for two pixels nudged by three levels it says `0.02`. Both would
+read as reassuring. `pixelDiff` differences the frames and counts the mask
+instead.
+
+**Captures are quieted before the shutter.** Animations are run to their end
+state rather than disabled — disabling them silently loses any element whose
+resting style is `opacity: 0` — infinite ones like spinners are pinned to their
+first frame, web fonts and images are awaited, and the caret is hidden. What
+that cannot fix is content the page rewrites on its own, which is what
+`--mask` is for.
+
+## Running the tests
+
+```bash
+node --test test/*.test.mjs
+```
+
+Node's built-in runner, no install. They build throwaway git repos under `/tmp`
+and point `UIDIFF_CACHE` at a scratch directory, so nothing touches your
+`~/.cache/uidiff` or your checkout. The image tests skip themselves when
+ImageMagick is absent.
+
+Most of them cover `lib/gitswap.mjs`, which rewinds real files on disk to build
+the "before" state. That is the one part of this tool that can destroy work, so
+every restore path has a test: uncommitted edits, files new since the ref, files
+deleted in the working tree, partially staged files, and finishing a swap that a
+crash left behind.
+
+The tests cannot reach Chrome, auth, or a running dev server. Exercise
+`uidiff compare` by hand before trusting a change to `lib/cdp.mjs` or the auth
+code in `lib/project.mjs`.
+
+## Gotchas
+
+**A refusal is usually correct.** If `compare` says a screenshot would show
+nothing, the change really is tests, docs, config or migrations. `--force`
+exists for when you know better — a `.ts` util that only renders on one route,
+say — but reaching for it habitually defeats the point. Anything ambiguous
+already runs anyway, with a note that a visible diff is not guaranteed.
+
+**Screenshots are written outside the checkout**, to `~/.cache/uidiff`. They
+are captures of live pages and can contain real data, and a stray `git add`
+should not be able to reach them. Delete that directory freely; it is all
+reproducible.
+
+## Contributing
+
+The scope above is where this has been used, not a judgement about what is
+worth supporting. The most useful contributions are the obvious ones: Linux and
+Windows equivalents for `open`/`pbcopy`, a readiness poll for stacks that
+compile, and auth for apps that keep a token in `localStorage` rather than a
+cookie.
+
+Maintenance is best-effort. See `CONTRIBUTING.md` for the mechanics of running
+tests and opening a PR.
+
+## Licence
+
+Apache-2.0. See `LICENSE` and `NOTICE`.

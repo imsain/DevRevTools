@@ -1,12 +1,15 @@
 {
-  "name": "uidiff",
+  "name": "devrevtools",
   "owner": {
     "name": "Sai Im"
+  },
+  "metadata": {
+    "description": "Developer-productivity plugins: visual diffing, and more to come."
   },
   "plugins": [
     {
       "name": "uidiff",
-      "source": "./",
+      "source": "./plugins/uidiff",
       "description": "Before/after UI screenshots and pixel-accurate diffs for a local dev server."
     }
   ]
