@@ -21,23 +21,6 @@ Use the `uidiff` CLI — it owns Chrome, local auth, capture, the pixel diff, an
 the HTML report. Do not hand-roll CDP scripts, and never inline screenshots as
 base64 yourself.
 
-```bash
-uidiff() {
-  local bin="$(git rev-parse --show-toplevel 2>/dev/null)/bin/uidiff.mjs"
-  [ -f "$bin" ] || { echo "uidiff: not in a checkout with the tool vendored (pwd: $PWD)" >&2; return 1; }
-  node "$bin" "$@"
-}
-```
-
-Adjust the `bin` path above to wherever this tool actually lives relative to
-the repo root — e.g. `.cursor/skills/uidiff/bin/uidiff.mjs` if it is vendored
-into a skills folder rather than cloned standalone. **Set the working
-directory to the frontend checkout on every call.** In
-a workspace that also has a separate backend repo open, terminals frequently
-start there instead, and the guard above is there so that shows up as one
-legible line rather than a `Cannot find module` that looks like a broken
-install.
-
 It needs Node, Chrome, git and ImageMagick. Everything but ImageMagick you
 almost certainly have; if it is missing, `compare` stops and says so rather
 than silently producing a worse report — offer `uidiff install-deps`
@@ -50,6 +33,65 @@ data.
 Shell calls need unrestricted execution permissions: headless Chrome needs
 `--no-sandbox`, which needs an unsandboxed shell.
 
+## Finding the CLI
+
+**Resolve it once, before the first call, and reuse that path for the rest of
+the session.** The tool is normally installed *outside* the repo being
+captured — as a plugin, or globally — so never look for it with `git rev-parse`,
+which finds the product you are screenshotting rather than the tool.
+
+In order, first hit wins:
+
+1. `$UIDIFF_BIN`, if it is set.
+2. `command -v uidiff`, for a global install already on `PATH`.
+3. `bin/uidiff.mjs` in **the directory this SKILL.md was loaded from**, whose
+   absolute path you already know. This is the case for a plugin install, and
+   the usual answer.
+
+Then define the shorthand this skill uses throughout, with the real path
+substituted in:
+
+```bash
+uidiff() { node /absolute/path/from/step/above/bin/uidiff.mjs "$@"; }
+```
+
+If none of the three resolve, say the tool is not installed and stop; do not
+try to clone or reinstall it.
+
+**Set the working directory to the repo being captured on every call.** The
+tool reads that repo's git state, its config and its dev server, and a
+workspace with a separate backend repo open frequently starts terminals in the
+wrong one:
+
+```bash
+cd <repo being captured> && uidiff doctor
+```
+
+## First run in a repo
+
+Every repo needs one committed `.uidiff.json` holding its dev server URL and
+sign-in method. `uidiff init` writes it, working out the port and the auth mode
+from the checkout as far as they can be detected:
+
+```bash
+cd <repo> && uidiff init && uidiff doctor
+```
+
+`init` prints what it found and how sure it was. **Read that rather than
+assuming it got everything right** — a `baseUrl` taken from a framework default
+is a guess, and `doctor` is what confirms it by actually reaching the server.
+In a monorepo it also reports which package it treated as the front end, which
+is worth a glance.
+
+If it reports `auth: none` and the pages need signing in, the route that works
+on any stack is a cookie: ask the user to sign in, copy the session cookie out
+of devtools, export `UIDIFF_COOKIE="name=value"`, and set `auth` to
+`{ "mode": "env" }`.
+
+Since `init` adds a file to the user's repo, offer it rather than running it
+silently when you are acting unprompted on a repo that has no config. When the
+user has actually asked for a comparison, just run it.
+
 ## Using it unprompted
 
 A visual change the user has not seen is unverified, so capture the comparison
@@ -61,10 +103,11 @@ the command line, so this works on the first request for any page.
 
 Skip it, without mentioning the skill, when:
 
-- the servers are not running, or `uidiff doctor` reports the config is missing
-  for this repo — say the change is unverified, and name what has to be running
-  (see Prerequisites: **both** the frontend and its backend) so the user can
-  decide. Don't start either one yourself.
+- the servers are not running — say the change is unverified, and name what has
+  to be running (see Prerequisites: **both** the frontend and its backend) so
+  the user can decide. Don't start either one yourself.
+- this repo has no config yet — say so, and offer `uidiff init` (see First run
+  in a repo) rather than writing the file unasked.
 - the user asked for speed, said not to bother, or is mid-iteration on
   something else
 
@@ -251,6 +294,7 @@ sources. For the real drag-to-compare slider, open the HTML report from
 ## Other commands
 
 ```bash
+uidiff init                      # write .uidiff.json for a repo that has none
 uidiff doctor                    # config, imagemagick, chrome, dev server, auth
 uidiff restore                   # undo an interrupted swap
 uidiff install-deps              # brew install imagemagick, with consent
@@ -277,9 +321,10 @@ settings — `baseUrl`, `viewport`, `settleMs`, `reloadWaitMs`, `fullPage`,
 particular screen is stored, so there is no file to edit before comparing
 something new and nothing to go stale when a selector is renamed.
 
-`UIDIFF_CONFIG` overrides it. For a new repo, copy `config.example.json` to
-`.uidiff.json` and set `baseUrl` and `auth`. A missing config makes `doctor`
-say so and name the path it wanted.
+`UIDIFF_CONFIG` overrides it. For a new repo, `uidiff init` writes the file —
+see First run in a repo. Every key it can hold is documented in
+`config.example.json`, next to the CLI. A missing config names the path it
+wanted and points at `init`.
 
 For pages behind sign-in, `auth.mode` is one of `none`, `env` (reads a cookie
 from `UIDIFF_COOKIE`), or `nextauth-offline` (mints one itself with a Next.js

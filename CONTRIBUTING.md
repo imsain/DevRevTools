@@ -20,6 +20,25 @@ for it — the image tests skip themselves when it is absent — but install it
 `lib/cdp.mjs` or the auth code in `lib/project.mjs`, since the automated tests
 can't reach Chrome, auth, or a dev server.
 
+The tests build throwaway git repos and commit to them, so a global
+`core.hooksPath` hook that expects a real project — a secret scanner, most
+likely — will fail them for reasons that have nothing to do with your change.
+If `git commit` is what's failing, that's why; whatever variable skips your
+hook will get the suite green.
+
+## Testing it as a plugin
+
+Symlink your checkout into Cursor's local plugin directory and reload the
+window:
+
+```bash
+ln -s "$PWD" ~/.cursor/plugins/local/uidiff
+```
+
+The skill resolves the CLI from its own installed directory, so this exercises
+the same path a teammate's install takes. `$UIDIFF_BIN` overrides it when you
+want a specific checkout to win.
+
 ## Before opening a PR
 
 - `node --test test/*.test.mjs` passes. CI runs this on macOS on every PR.

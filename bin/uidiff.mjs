@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // uidiff — before/after UI screenshots for a local dev server.
 //
+//   uidiff init
 //   uidiff doctor
 //   uidiff compare <path> [--before-ref HEAD] [--crop <selector>]
 //   uidiff markdown <path>
@@ -51,6 +52,7 @@ import {
   pixelDiff
 } from '../lib/report.mjs';
 import { numberFlag, parseArgs } from '../lib/args.mjs';
+import { initConfig } from '../lib/init.mjs';
 import { buildMarkdown } from '../lib/markdown.mjs';
 import { wipeGif } from '../lib/wipe.mjs';
 import { buildRules, classifyChange } from '../lib/visual.mjs';
@@ -541,6 +543,31 @@ async function commandMarkdown(root, config, args) {
   console.log(markdown);
 }
 
+/**
+ * Writes the one file a new repo needs. Deliberately says what it detected and
+ * how sure it is: a baseUrl inferred from a framework default is a good guess
+ * and nothing more, and the user is the only one who can confirm it.
+ */
+function commandInit(root, args) {
+  const { path, detected } = initConfig(root, {
+    force: Boolean(args.flags.force)
+  });
+  console.log(`wrote ${path}`);
+  console.log(
+    `app: ${detected.appDir}${detected.framework ? ` (${detected.framework})` : ''}`
+  );
+  console.log(`baseUrl: ${detected.baseUrl} — from ${detected.portSource}`);
+  console.log(`auth: ${detected.auth.mode}`);
+  for (const note of detected.notes) {
+    console.log(`  ${note}`);
+  }
+  console.log('');
+  console.log(
+    'Commit it — these settings belong to the repo. Then start the dev server' +
+      ' and run "uidiff doctor".'
+  );
+}
+
 async function commandDoctor(root, config) {
   console.log(`repo: ${root}`);
   console.log(`config: ${configPath(root)}`);
@@ -580,6 +607,7 @@ async function commandDoctor(root, config) {
 
 const HELP = `uidiff — before/after UI screenshots for a local dev server
 
+  uidiff init [--force]              write .uidiff.json for this repo
   uidiff doctor                      check config, chrome, dev server, auth
   uidiff compare <path> [--before-ref <ref>]
   uidiff markdown <path> [--no-open]
@@ -654,6 +682,12 @@ async function main() {
   if (command === 'restore') {
     const count = restoreSwap(root);
     console.log(count ? `restored ${count} file(s)` : 'nothing to restore');
+    return;
+  }
+
+  // Before loadConfig, which is the thing it exists to satisfy.
+  if (command === 'init') {
+    commandInit(root, args);
     return;
   }
 

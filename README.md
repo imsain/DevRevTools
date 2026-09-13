@@ -40,21 +40,50 @@ used. See "Contributing" below.
   Declining is fine — `--skip-crops` gives you the full-page pair without the
   crops, the pixel-diff count or the wipe animation.
 
-## Setting it up for a repo
+## Installing it
 
-Copy `config.example.json` to `.uidiff.json` at the root of the repo you want
-to capture, then set `baseUrl` and `auth`. That file is the whole configuration
-— it holds per-repo settings only, never anything about a particular screen.
+**As a Cursor plugin.** Paste this repository's URL into the plugin search in
+Cursor and install it. The agent-facing `SKILL.md` and the CLI arrive together,
+and the agent resolves the CLI out of the installed plugin directory, so there
+is nothing to put on your `PATH` and nothing to vendor into the repo you want
+to capture. To hand it to a whole team at once, point Dashboard → Plugins →
+Team Marketplaces at the repository instead; note that marketplace plugins are
+not auto-updated from source, so a new version needs a re-index.
+
+**On the command line.** Clone it anywhere and either link it or wrap it:
 
 ```bash
+git clone https://github.com/imsain/uidiff && cd uidiff && npm link
+# or, without npm:
 uidiff() { node /path/to/uidiff/bin/uidiff.mjs "$@"; }
+```
 
+`$UIDIFF_BIN` overrides where the skill looks, if you want a checkout of your
+own to win over an installed plugin.
+
+## Setting it up for a repo
+
+Each repo you capture needs one `.uidiff.json` at its root, holding its dev
+server URL and how to sign in. `uidiff init` writes it:
+
+```bash
 cd your-repo
+uidiff init
 uidiff doctor
 ```
 
+`init` reads the checkout — the front end's `package.json` even when it is
+buried in a monorepo, the port named in its dev script, the framework's default
+port otherwise, and whether it uses an Auth.js version that can be signed
+offline — then prints what it detected and how confident it was. Treat a port
+it inferred from a framework default as a guess until `doctor` confirms it.
+
 `doctor` prints config, viewport, ImageMagick, Chrome, dev server and auth in
 seven lines, and is the right first move whenever something looks wrong.
+
+That config is the whole configuration, it holds per-repo settings only, and it
+is meant to be committed. `config.example.json` documents every key it can
+take; `init` writes only the two that have no sensible default.
 
 Start your dev server yourself; the tool never starts one and won't fight one
 you already have. **If your pages fetch from a separate API, start that too** —
@@ -65,6 +94,7 @@ overlay as a result.
 ## Using it
 
 ```bash
+uidiff init                               # one-off, per repo
 uidiff compare /dashboard                 # working tree vs HEAD, then a report
 uidiff markdown /dashboard                # PR body on the clipboard + images to drag in
 ```
