@@ -42,15 +42,53 @@ used. See "Contributing" below.
 
 ## Installing it
 
-**As a Cursor plugin.** Paste this repository's URL into the plugin search in
-Cursor and install it. The agent-facing `SKILL.md` and the CLI arrive together,
-and the agent resolves the CLI out of the installed plugin directory, so there
-is nothing to put on your `PATH` and nothing to vendor into the repo you want
-to capture. To hand it to a whole team at once, point Dashboard → Plugins →
-Team Marketplaces at the repository instead; note that marketplace plugins are
-not auto-updated from source, so a new version needs a re-index.
+**As a Cursor plugin, from the IDE.** Paste this repository's URL into the
+plugin search in Cursor (Customize → Plugins) and install it. The agent-facing
+`SKILL.md` and the CLI arrive together, and the agent resolves the CLI out of
+the installed plugin directory, so there is nothing to put on your `PATH` and
+nothing to vendor into the repo you want to capture. To hand it to a whole
+team at once, point Dashboard → Plugins → Team Marketplaces at the repository
+instead; note that marketplace plugins are not auto-updated from source, so a
+new version needs a re-index.
 
-**On the command line.** Clone it anywhere and either link it or wrap it:
+**As a Cursor plugin, from the CLI.** `cursor-agent` manages plugins through
+marketplaces rather than installing a URL directly:
+
+```bash
+cursor-agent plugin marketplace add https://github.com/imsain/uidiff
+```
+
+Then, in an interactive `cursor-agent` session, `/plugin` (or `/plugins`)
+lists `uidiff` under that marketplace and installs it at user or project
+scope.
+
+> **If a plugin search or a previous `marketplace add` reports no plugin
+> found**, it likely registered a marketplace before this repository had a
+> `.cursor-plugin/marketplace.json`, or against an old commit. `cursor-agent
+> plugin marketplace list` shows every marketplace registered under this
+> name or URL — a duplicate is common, since pasting the URL into IDE search
+> and running `marketplace add` in the CLI can each register their own entry.
+> `marketplace update <name>` does **not** reliably fix an entry stuck at
+> zero plugins; remove it and add it again:
+>
+> ```bash
+> cursor-agent plugin marketplace remove <stale-name>
+> cursor-agent plugin marketplace add https://github.com/imsain/uidiff
+> ```
+
+**As a Claude Code plugin.** This repository is also a Claude Code plugin
+marketplace (`.claude-plugin/marketplace.json` alongside the Cursor one), with
+the same `SKILL.md` and CLI:
+
+```bash
+claude plugin marketplace add imsain/uidiff
+claude plugin install uidiff
+```
+
+`claude plugin details uidiff` confirms the skill registered correctly.
+
+**On the command line, without either plugin system.** Clone it anywhere and
+either link it or wrap it:
 
 ```bash
 git clone https://github.com/imsain/uidiff && cd uidiff && npm link
