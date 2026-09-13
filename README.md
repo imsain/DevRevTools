@@ -8,6 +8,8 @@ they share this repo's issue tracker, CI, and contribution process.
 
 - **[uidiff](plugins/uidiff/)** — before/after UI screenshots and pixel-accurate
   diffs for a local dev server.
+- **[datadiff](plugins/datadiff/)** — before/after row-level diffs for a SQL
+  query or a data-processing function, shown as a table and chart.
 
 ## Installing a plugin
 

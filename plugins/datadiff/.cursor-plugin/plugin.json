@@ -1,0 +1,17 @@
+{
+  "name": "datadiff",
+  "description": "Runs a SQL query or a data-processing function before and after a code change, and shows the row-level difference as a table (added/removed/changed rows) plus a chart of any numeric column whose total moved. Rebuilds the \"before\" state by swapping the query file or function file to a git ref, the same trick uidiff uses for screenshots. macOS-friendly, no npm dependencies; SQL needs snowsql on PATH. Use when reviewing a change to a query or transform function, or checking what a change to either actually did to the data.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Sai Im"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/imsain/DevRevTools",
+  "repository": "https://github.com/imsain/DevRevTools",
+  "keywords": [
+    "sql",
+    "data-diff",
+    "snowflake",
+    "cli"
+  ]
+}

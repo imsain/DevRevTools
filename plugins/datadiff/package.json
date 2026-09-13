@@ -1,0 +1,33 @@
+{
+  "name": "datadiff",
+  "version": "0.1.0",
+  "description": "Before/after row-level diffs for a SQL query or a data-processing function, shown as a table and chart. No npm dependencies; needs git and, for SQL, snowsql.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "datadiff": "bin/datadiff.mjs"
+  },
+  "engines": {
+    "node": ">=21"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md",
+    "SKILL.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imsain/DevRevTools.git"
+  },
+  "keywords": [
+    "sql",
+    "data-diff",
+    "visual-regression",
+    "snowflake",
+    "cli"
+  ]
+}
