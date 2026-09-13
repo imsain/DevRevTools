@@ -69,13 +69,13 @@ function targetFromArgs(root, args) {
   );
 }
 
-async function runTarget(config, target, args) {
+async function runTarget(root, config, target, args) {
   if (target.kind === 'query') {
     const sql = fillParams(readFileSync(target.absolute, 'utf8'), paramFlags(args));
     return runQuery(config, sql);
   }
   const input = readInput(args.flags.input);
-  return runFunction(target.absolute, target.exportName, input);
+  return runFunction(target.absolute, target.exportName, input, root);
 }
 
 /** Caps an array so a huge result doesn't get embedded whole in a canvas —
@@ -92,13 +92,13 @@ async function commandCompare(root, config, args) {
   const beforeRef = args.flags['before-ref'] ?? 'HEAD';
   const key = args.flags.key ? String(args.flags.key) : undefined;
 
-  const after = await runTarget(config, target, args);
+  const after = await runTarget(root, config, target, args);
   console.log(`ran ${target.label} against the working tree`);
 
   const restore = swapToRef(root, beforeRef, [target.file]);
   let before;
   try {
-    before = await runTarget(config, target, args);
+    before = await runTarget(root, config, target, args);
   } finally {
     const count = restore();
     console.log(`restored ${count} file(s) to their pre-swap contents`);
@@ -124,9 +124,11 @@ async function commandCompare(root, config, args) {
     );
   }
   for (const entry of summary) {
+    const move = Math.round((entry.after - entry.before) * 100) / 100;
     console.log(
-      `  ${entry.column}: ${entry.beforeSum} -> ${entry.afterSum}` +
-        ` (${entry.afterSum - entry.beforeSum >= 0 ? '+' : ''}${(entry.afterSum - entry.beforeSum).toLocaleString()})`
+      `  ${entry.column} (${entry.kind === 'sum' ? 'total' : 'average'}): ` +
+        `${entry.before} -> ${entry.after}` +
+        ` (${move >= 0 ? '+' : ''}${move.toLocaleString()})`
     );
   }
 

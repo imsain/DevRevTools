@@ -12,8 +12,11 @@ agent-facing version; this one is for setting it up on your machine.
   file to a ref, same trick `uidiff` uses for screenshots.
 - **Node 21+.**
 - **`snowsql`**, only if you diff a `--query` target. A `--function` target
-  needs nothing beyond Node — it dynamically imports the module and calls the
-  named export directly.
+  needs nothing beyond Node — it imports the module and calls the named
+  export directly.
+- **`typescript` in the target repo**, only if you diff a `--function` target
+  written in TypeScript that uses enums, decorators, or parameter properties.
+  Plain type annotations need nothing extra.
 
 ## Installing it
 
@@ -61,7 +64,21 @@ datadiff canvas --function lib/transform.mjs#normalizeRows
 
 `--input` is a JSON file passed as the function's single argument — the same
 fixture both the "before" and "after" run see, so the diff is purely the
-code's own change.
+code's own change. Each run happens in its own process, so import-time caches
+and module-level state can't carry "before" into "after".
+
+TypeScript targets work directly, including the resolution rules a real app
+relies on — `tsconfig.json` `baseUrl` and `paths` aliases (following
+`extends`), extension-less and `index.ts` imports, and enums or decorators
+that Node's own type-stripping rejects:
+
+```bash
+datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath --input fixtures/rows.json
+```
+
+Enums and decorators need the repo's own `typescript` installed; without it,
+plain type annotations still run on Node's built-in stripping. Nothing is
+type-*checked* either way.
 
 ## Scope
 

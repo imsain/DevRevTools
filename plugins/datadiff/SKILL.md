@@ -79,6 +79,35 @@ way the SQL file is; if the behaviour change actually lives in a helper it
 imports rather than the named file itself, swap that helper too by pointing
 `--before-ref` and the target at whichever file actually changed.
 
+The function's result has to survive `JSON.stringify`, and each run happens
+in a fresh process, so a module that counts calls or caches at import time
+reports the same thing both times rather than leaking "before" into "after".
+
+### TypeScript targets
+
+`--function` takes a `.ts` file directly:
+
+```bash
+datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath --input fixtures/rows.json
+```
+
+The repo's own resolution rules are honoured, which is what makes real
+application code reachable rather than only standalone scripts:
+
+- `tsconfig.json` `baseUrl` and `paths` aliases, including through `extends`,
+  so `import { x } from 'lib/utils'` resolves the way the compiler resolves it
+- extension-less and directory (`index.ts`) imports
+- syntax Node cannot strip by itself — enums, decorators, parameter
+  properties — by transpiling through the repo's installed `typescript`
+
+If a repo has no `typescript` installed, plain type annotations still work via
+Node's own stripping, but an `enum` or a decorator anywhere in the import graph
+fails with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`. Installing `typescript` in that
+repo is the fix.
+
+Type *checking* never happens — only stripping and transpilation. A target
+that does not compile cleanly still runs, exactly as it would under `tsx`.
+
 ## Showing the result
 
 ```bash
@@ -87,9 +116,12 @@ datadiff canvas --query path/to/query.sql
 ```
 
 Reads the run `compare` just saved and writes a Cursor Canvas with the diff
-as a table (changed cells highlighted, added/removed rows marked) plus a bar
-chart of any numeric column whose before/after total moved — the part a
-table alone doesn't make legible when a lot of rows changed by a little.
+as a table (each changed cell showing `old → new`, added/removed rows marked)
+plus a bar chart of any numeric column whose before/after total moved — the
+part a table alone doesn't make legible when a lot of rows changed by a
+little. Percentage and rate columns are averaged and listed separately
+instead of charted, since summing them produces a meaningless number and
+plotting one next to a headcount hides it against the axis.
 Link the printed path so the user can open it, e.g.
 `[Diff](/absolute/path/to/datadiff-....canvas.tsx)`.
 

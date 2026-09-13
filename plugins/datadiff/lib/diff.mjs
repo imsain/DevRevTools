@@ -100,16 +100,44 @@ export function diffRows({ before, after, key }) {
   };
 }
 
+/** Tolerant of the formatting real results arrive in: "1,240" and "40.3%"
+ * are numbers, "n/a" is not. */
+export function toNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const cleaned = String(value).trim().replace(/[,%\s]/g, '');
+  if (cleaned === '') {
+    return null;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** A percentage or rate is an average of its rows, never a sum: adding four
+ * "% women" values together produces a number like 166% that means nothing. */
+const RATIO_NAME = /percent|pct|ratio|rate|share|avg|average|mean|delta/i;
+
+function isRatio(column, values) {
+  return (
+    RATIO_NAME.test(column) ||
+    values.some((value) => typeof value === 'string' && value.trim().endsWith('%'))
+  );
+}
+
 /**
- * Sum/before vs sum/after for every column where the values on both sides
- * are numbers (or blank) — skipping ids and text columns automatically
- * rather than asking the caller to name which columns are numeric. Over the
- * *entire* row set, not just the changed rows, so an added or removed row's
- * contribution to the total is part of the picture too.
+ * Before vs after aggregate for every column whose values are numbers on
+ * both sides — skipping ids and text columns automatically rather than
+ * asking the caller to name which are numeric. Over the *entire* row set,
+ * not just the changed rows, so an added or removed row's contribution
+ * counts too.
  *
  * `exclude` should include the `--key` column when there is one: an id is
- * numeric-looking but summing it is meaningless, and would otherwise show up
- * as a "changed total" any time a row was added or removed.
+ * numeric-looking but aggregating it is meaningless, and would otherwise
+ * show up as a "changed total" any time a row was added or removed.
  */
 export function numericColumnSummary(before, after, exclude = []) {
   const beforeRows = normalizeRows(before).rows;
@@ -125,27 +153,24 @@ export function numericColumnSummary(before, after, exclude = []) {
   const summary = [];
   for (const column of columns) {
     const values = [...beforeRows, ...afterRows].map((row) => row?.[column]);
-    const numeric = values.every(
-      (value) =>
-        value === undefined ||
-        value === null ||
-        value === '' ||
-        Number.isFinite(Number(value))
-    );
-    const anyValue = values.some((value) => value !== '' && value != null);
-    if (!numeric || !anyValue) {
+    const present = values.filter((value) => value !== '' && value != null);
+    if (present.length === 0 || present.some((value) => toNumber(value) === null)) {
       continue;
     }
-    const sum = (rows) =>
-      rows.reduce((total, row) => {
-        const value = Number(row?.[column]);
-        return total + (Number.isFinite(value) ? value : 0);
-      }, 0);
-    summary.push({
-      column,
-      beforeSum: sum(beforeRows),
-      afterSum: sum(afterRows)
-    });
+
+    const kind = isRatio(column, values) ? 'average' : 'sum';
+    const aggregate = (rows) => {
+      const numbers = rows
+        .map((row) => toNumber(row?.[column]))
+        .filter((value) => value !== null);
+      const total = numbers.reduce((sum, value) => sum + value, 0);
+      if (kind === 'sum') {
+        return total;
+      }
+      return numbers.length ? Math.round((total / numbers.length) * 100) / 100 : 0;
+    };
+
+    summary.push({ column, kind, before: aggregate(beforeRows), after: aggregate(afterRows) });
   }
-  return summary.filter((entry) => entry.beforeSum !== entry.afterSum);
+  return summary.filter((entry) => entry.before !== entry.after);
 }

@@ -19,15 +19,38 @@ export function canvasDir(root) {
 const js = (value) => JSON.stringify(value);
 
 function cellText(row, column) {
-  const value = row[column];
-  return value === undefined || value === '' ? '—' : String(value);
+  const value = row?.[column];
+  if (value === undefined || value === null || value === '') {
+    return '—';
+  }
+  // Real result rows carry nested objects (display metadata, chart series).
+  // `String()` turns those into "[object Object]", which tells the reader
+  // nothing about whether they changed.
+  if (typeof value === 'object') {
+    const json = JSON.stringify(value);
+    return json.length > 80 ? `${json.slice(0, 79)}…` : json;
+  }
+  return String(value);
 }
 
-function cellContent(column, row, changedColumns) {
+/** A changed cell shows both values. What a number changed *from* is most of
+ * the information in a data diff — highlighting the new value alone leaves
+ * the reader to go find the old one. */
+function changedCell(before, after, column) {
+  return (
+    `<Text><Text style={{ background: theme.diff.stripRemoved, textDecoration: 'line-through', padding: '1px 4px', borderRadius: 3 }}>{${js(
+      cellText(before, column)
+    )}}</Text>{' \u2192 '}<Text style={{ background: theme.diff.stripAdded, padding: '1px 4px', borderRadius: 3 }}>{${js(
+      cellText(after, column)
+    )}}</Text></Text>`
+  );
+}
+
+function cellContent(column, before, after, changedColumns) {
   if (!changedColumns?.includes(column)) {
-    return js(cellText(row, column));
+    return js(cellText(after, column));
   }
-  return `<Text style={{ background: theme.diff.stripAdded, padding: '1px 4px', borderRadius: 3 }}>{${js(cellText(row, column))}}</Text>`;
+  return changedCell(before, after, column);
 }
 
 function tableRows(diff) {
@@ -52,10 +75,10 @@ function tableRows(diff) {
       )
     });
   }
-  for (const { after, changedColumns } of diff.changed) {
+  for (const { before, after, changedColumns } of diff.changed) {
     rows.push({
       tone: 'warning',
-      cells: diff.columns.map((column) => cellContent(column, after, changedColumns))
+      cells: diff.columns.map((column) => cellContent(column, before, after, changedColumns))
     });
   }
   return rows;
@@ -74,18 +97,44 @@ export function buildCanvasCode({ target, meta, diff, summary }) {
   const rowToneCode = rows.map((row) => js(row.tone)).join(', ');
   const headersCode = diff.columns.map((column) => js(column)).join(', ');
 
+  // Percentages are kept out of the bars on purpose: charting a 40.3 next to
+  // a 28,560 on one axis renders the percentage as no bar at all.
+  const totals = summary.filter((entry) => entry.kind === 'sum');
+  const averages = summary.filter((entry) => entry.kind !== 'sum');
+
+  const delta = (entry) => {
+    const move = Math.round((entry.after - entry.before) * 100) / 100;
+    return `${move >= 0 ? '+' : ''}${move.toLocaleString()}`;
+  };
+
   const chart =
-    summary.length > 0
+    totals.length > 0
       ? `
       <Stack gap={8}>
         <Text weight="medium">Changed totals by column</Text>
         <BarChart
-          categories={[${summary.map((entry) => js(entry.column)).join(', ')}]}
+          categories={[${totals.map((entry) => js(entry.column)).join(', ')}]}
           series={[
-            { name: 'Before', data: [${summary.map((entry) => entry.beforeSum).join(', ')}] },
-            { name: 'After', data: [${summary.map((entry) => entry.afterSum).join(', ')}] }
+            { name: 'Before', data: [${totals.map((entry) => entry.before).join(', ')}] },
+            { name: 'After', data: [${totals.map((entry) => entry.after).join(', ')}] }
           ]}
         />
+      </Stack>`
+      : '';
+
+  const averageStats =
+    averages.length > 0
+      ? `
+      <Stack gap={8}>
+        <Text weight="medium">Changed averages</Text>
+${averages
+  .map(
+    (entry) =>
+      `        <Stat label={${js(`${entry.column} (average)`)}} value={${js(
+        `${entry.before} → ${entry.after}  (${delta(entry)})`
+      )}} />`
+  )
+  .join('\n')}
       </Stack>`
       : '';
 
@@ -116,7 +165,7 @@ ${rowsCode}
         striped
         stickyHeader
         emptyMessage={${js('No added, removed, or changed rows.')}}
-      />${chart}
+      />${chart}${averageStats}
     </Stack>
   );
 }

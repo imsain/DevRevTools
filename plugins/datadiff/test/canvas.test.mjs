@@ -50,6 +50,58 @@ test('a changed cell value is also inside {}, not literal JSX text', () => {
   assert.doesNotMatch(code, />"30"</);
 });
 
+test('a changed cell shows what the value changed from, not just to', () => {
+  const diff = diffRows({
+    before: [{ id: 1, amount: 10 }],
+    after: [{ id: 1, amount: 30 }],
+    key: 'id'
+  });
+  const code = buildCanvasCode({
+    target: 'query x.sql',
+    meta: 'demo',
+    diff,
+    summary: []
+  });
+  assert.match(code, /\{"10"\}/);
+  assert.match(code, /\{"30"\}/);
+  assert.match(code, /\u2192/);
+});
+
+test('a percentage column is kept out of the bar chart and shown as a stat', () => {
+  const before = [{ id: 1, HEADCOUNT: 100, WOMEN_PERCENT: 40 }];
+  const after = [{ id: 1, HEADCOUNT: 112, WOMEN_PERCENT: 35 }];
+  const diff = diffRows({ before, after, key: 'id' });
+  const summary = numericColumnSummary(before, after, ['id']);
+  const code = buildCanvasCode({ target: 'q', meta: 'demo', diff, summary });
+
+  const chart = code.slice(code.indexOf('<BarChart'), code.indexOf('</Stack>', code.indexOf('<BarChart')));
+  assert.match(chart, /HEADCOUNT/);
+  assert.doesNotMatch(chart, /WOMEN_PERCENT/);
+  assert.match(code, /WOMEN_PERCENT \(average\)/);
+});
+
+test('a nested object cell shows its contents, not [object Object]', () => {
+  const diff = diffRows({
+    before: [{ id: 1, display: [{ colour: 'red' }] }],
+    after: [{ id: 1, display: [{ colour: 'blue' }] }],
+    key: 'id'
+  });
+  const code = buildCanvasCode({ target: 'q', meta: 'demo', diff, summary: [] });
+  assert.doesNotMatch(code, /\[object Object\]/);
+  assert.match(code, /colour/);
+});
+
+test('a null cell reads as an em dash rather than the word null', () => {
+  const diff = diffRows({
+    before: [{ id: 1, note: null, amount: 1 }],
+    after: [{ id: 1, note: null, amount: 2 }],
+    key: 'id'
+  });
+  const code = buildCanvasCode({ target: 'q', meta: 'demo', diff, summary: [] });
+  assert.doesNotMatch(code, /"null"/);
+  assert.match(code, /"—"/);
+});
+
 test('no chart is emitted when nothing numeric changed', () => {
   const diff = diffRows({
     before: [{ id: 1, name: 'a' }],

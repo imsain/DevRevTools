@@ -64,7 +64,9 @@ test('numeric column summary sums a changed column across the whole set', () => 
   const before = [{ id: 1, amount: 10 }, { id: 2, amount: 20 }];
   const after = [{ id: 1, amount: 15 }, { id: 2, amount: 20 }];
   const summary = numericColumnSummary(before, after);
-  assert.deepEqual(summary, [{ column: 'amount', beforeSum: 30, afterSum: 35 }]);
+  assert.deepEqual(summary, [
+    { column: 'amount', kind: 'sum', before: 30, after: 35 }
+  ]);
 });
 
 test('numeric column summary skips columns that did not move', () => {
@@ -84,7 +86,36 @@ test('an added or removed row still counts toward the column total', () => {
   const before = [{ id: 1, amount: 10 }];
   const after = [{ id: 1, amount: 10 }, { id: 2, amount: 5 }];
   const summary = numericColumnSummary(before, after, ['id']);
-  assert.deepEqual(summary, [{ column: 'amount', beforeSum: 10, afterSum: 15 }]);
+  assert.deepEqual(summary, [
+    { column: 'amount', kind: 'sum', before: 10, after: 15 }
+  ]);
+});
+
+test('a percentage column is averaged, not summed', () => {
+  const before = [{ id: 1, WOMEN_PERCENT: 40 }, { id: 2, WOMEN_PERCENT: 60 }];
+  const after = [{ id: 1, WOMEN_PERCENT: 30 }, { id: 2, WOMEN_PERCENT: 60 }];
+  const summary = numericColumnSummary(before, after, ['id']);
+  assert.deepEqual(summary, [
+    { column: 'WOMEN_PERCENT', kind: 'average', before: 50, after: 45 }
+  ]);
+});
+
+test('a percent-formatted string column is still recognised as numeric', () => {
+  const before = [{ id: 1, share: '40.5%' }];
+  const after = [{ id: 1, share: '41.5%' }];
+  const summary = numericColumnSummary(before, after, ['id']);
+  assert.deepEqual(summary, [
+    { column: 'share', kind: 'average', before: 40.5, after: 41.5 }
+  ]);
+});
+
+test('a thousands-separated number is summed, not discarded as text', () => {
+  const before = [{ id: 1, amount: '1,200' }];
+  const after = [{ id: 1, amount: '1,250' }];
+  const summary = numericColumnSummary(before, after, ['id']);
+  assert.deepEqual(summary, [
+    { column: 'amount', kind: 'sum', before: 1200, after: 1250 }
+  ]);
 });
 
 test('the excluded key column is never summed, even though it looks numeric', () => {
