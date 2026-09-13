@@ -80,6 +80,35 @@ Enums and decorators need the repo's own `typescript` installed; without it,
 plain type annotations still run on Node's built-in stripping. Nothing is
 type-*checked* either way.
 
+## Showing the page too
+
+A data change usually exists because something renders it. `--ui` captures
+that page before and after the same swap the row diff used, through the
+`uidiff` CLI, and puts the drag-slider in the same canvas as the table:
+
+```bash
+datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath \
+  --input fixtures/rows.json \
+  --ui /fpm/dashboard \
+  --ui-root ../pam-core_frontend \
+  --ui-reload-wait 40000
+```
+
+- `--ui-root <dir>` — the repo whose `.uidiff.json` names the dev server, for
+  when the code and the page it feeds live in separate repos. The swap still
+  happens in the repo you ran `datadiff` from.
+- `--ui-reload-wait <ms>` — how long that dev server needs to pick up the
+  swapped file. Server-side code means a recompile; if both frames look the
+  same, raise this first.
+- `--ui-click`, `--ui-hover`, `--ui-wait`, `--ui-wait-for`, `--ui-settle`,
+  `--ui-full-page` — the same page-state flags `uidiff` takes, in order.
+
+The dev server has to be serving the changed code for this to mean anything,
+which for a backend target means running it in watch mode.
+
+Needs the `uidiff` plugin installed beside this one, or `uidiff` on your PATH,
+or `UIDIFF_BIN` pointing at it.
+
 ## Scope
 
 Narrow on purpose, same spirit as `uidiff`:

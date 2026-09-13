@@ -2,7 +2,7 @@
 // plus a bar chart of any numeric column whose before/after total moved —
 // the "chart of a change" a table alone doesn't make legible at a glance.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,6 +17,80 @@ export function canvasDir(root) {
 }
 
 const js = (value) => JSON.stringify(value);
+
+/** Width/height straight out of the PNG's IHDR chunk, so a canvas never
+ * needs ImageMagick just to lay an image out. */
+function pngSize(file) {
+  const buffer = readFileSync(file);
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+const dataUri = (file) =>
+  `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+
+/** The same drag-to-compare frame uidiff's own canvas uses. Duplicated rather
+ * than imported: the two plugins install independently, so datadiff cannot
+ * rely on uidiff's files being on disk next to it. */
+function sliderComponent() {
+  return `
+function Slider({ label, before, after, width, height }) {
+  const theme = useHostTheme();
+  const frameRef = useRef(null);
+  const [position, setPosition] = useState(50);
+
+  const moveTo = (clientX) => {
+    const bounds = frameRef.current.getBoundingClientRect();
+    setPosition(Math.max(0, Math.min(100, ((clientX - bounds.left) / bounds.width) * 100)));
+  };
+
+  return (
+    <Stack gap={6}>
+      <Text weight="medium">{label}</Text>
+      <div
+        ref={frameRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={label + ': reveal before or after'}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(position)}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          moveTo(event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (event.buttons === 1) moveTo(event.clientX);
+        }}
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 10 : 2;
+          if (event.key === 'ArrowLeft') setPosition((p) => Math.max(0, p - step));
+          if (event.key === 'ArrowRight') setPosition((p) => Math.min(100, p + step));
+        }}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: Math.min(width, 900),
+          aspectRatio: width + ' / ' + height,
+          overflow: 'hidden',
+          border: '1px solid ' + theme.stroke.primary,
+          borderRadius: 6,
+          cursor: 'ew-resize',
+          touchAction: 'none'
+        }}
+      >
+        <img src={after} alt="After" draggable={false}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', userSelect: 'none', pointerEvents: 'none' }} />
+        <img src={before} alt="Before" draggable={false}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', userSelect: 'none', pointerEvents: 'none', clipPath: 'inset(0 ' + (100 - position) + '% 0 0)' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: position + '%', width: 1, background: theme.accent.primary, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '50%', left: position + '%', width: 20, height: 20, marginTop: -10, marginLeft: -10, borderRadius: '50%', background: theme.accent.primary, border: '2px solid ' + theme.bg.editor, pointerEvents: 'none' }} />
+        <Pill tone="neutral" style={{ position: 'absolute', top: 8, left: 8, opacity: position > 12 ? 1 : 0 }}>BEFORE</Pill>
+        <Pill tone="neutral" style={{ position: 'absolute', top: 8, right: 8, opacity: position < 88 ? 1 : 0 }}>AFTER</Pill>
+      </div>
+    </Stack>
+  );
+}`;
+}
 
 function cellText(row, column) {
   const value = row?.[column];
@@ -89,7 +163,7 @@ function tableRows(diff) {
  * `numericColumnSummary`'s output — pass `[]` when there's nothing worth
  * charting.
  */
-export function buildCanvasCode({ target, meta, diff, summary }) {
+export function buildCanvasCode({ target, meta, diff, summary, ui }) {
   const rows = tableRows(diff);
   const rowsCode = rows
     .map((row) => `    [${row.cells.join(', ')}]`)
@@ -138,8 +212,34 @@ ${averages
       </Stack>`
       : '';
 
-  return `import { BarChart, DiffStats, Stack, Stat, Table, Text, useHostTheme } from "cursor/canvas";
+  // The page comes first when there is one: what a reviewer recognises is
+  // the screen, and the table underneath explains what moved on it.
+  const screenshots = ui?.before && ui?.after;
+  const frame = screenshots ? pngSize(ui.after) : null;
+  const uiConsts = screenshots
+    ? `const uiBefore = ${js(dataUri(ui.before))};\nconst uiAfter = ${js(dataUri(ui.after))};\n${sliderComponent()}\n`
+    : '';
+  const uiSection = screenshots
+    ? `
+      <Slider label={${js(ui.route)}} before={uiBefore} after={uiAfter} width={${frame.width}} height={${frame.height}} />
+      <Text tone="secondary" style={{ fontSize: 12 }}>Drag the frame, or focus it and use the arrow keys.</Text>`
+    : '';
 
+  const imports = [
+    'BarChart',
+    'DiffStats',
+    ...(screenshots ? ['Pill'] : []),
+    'Stack',
+    'Stat',
+    'Table',
+    'Text',
+    'useHostTheme',
+    ...(screenshots ? ['useRef', 'useState'] : [])
+  ];
+
+  return `import { ${imports.join(', ')} } from "cursor/canvas";
+
+${uiConsts}
 export default function DataDiffCanvas() {
   const theme = useHostTheme();
   const headers = [${headersCode}];
@@ -153,7 +253,7 @@ ${rowsCode}
       <Stack gap={4}>
         <Text weight="medium" style={{ fontSize: 18 }}>{${js(target)}}</Text>
         <Text tone="secondary" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{${js(meta)}}</Text>
-      </Stack>
+      </Stack>${uiSection}
       <Stack gap={4}>
         <DiffStats additions={${diff.added.length}} deletions={${diff.removed.length}} />
         <Stat label="Rows changed" value={${js(`${diff.changed.length} of ${diff.changed.length + diff.unchanged.length + diff.removed.length} matched rows`)}} />

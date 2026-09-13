@@ -108,6 +108,43 @@ repo is the fix.
 Type *checking* never happens — only stripping and transpilation. A target
 that does not compile cleanly still runs, exactly as it would under `tsx`.
 
+## Showing the page the data feeds
+
+```bash
+datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath \
+  --input fixtures/rows.json \
+  --ui /fpm/dashboard --ui-root ../pam-core_frontend --ui-reload-wait 40000
+```
+
+`--ui <route>` captures that route before and after the *same* swap the data
+diff used, via the `uidiff` CLI, and puts the drag-slider in the same canvas
+as the table. Use it whenever the changed numbers are rendered somewhere: the
+table says a total moved by 288, the screenshot says whether anyone looking at
+the page would notice.
+
+`--ui-root <dir>` is for the common full-stack case where the code being
+diffed and the page showing it live in different repos — a backend transform
+rendered by a frontend dev server. Point it at the repo whose `.uidiff.json`
+names the dev server; the git swap still happens in the repo `datadiff` is
+run from. Without it, the route is assumed to be served by this repo.
+
+`--ui-reload-wait <ms>` is usually required for server-side code, and
+generous: the dev server has to notice the swapped file and recompile before
+the "before" frame means anything. A frontend edit with fast refresh needs
+little or none; a NestJS backend in watch mode needs tens of seconds. If both
+frames come out identical, this is the first thing to raise.
+
+Reaching a state works the same way it does in `uidiff`, applied in order and
+repeatable: `--ui-click`, `--ui-hover`, `--ui-wait`, `--ui-wait-for`. Also
+`--ui-settle <ms>` and `--ui-full-page`.
+
+Two cautions worth passing on to the user:
+
+- The dev server must already be serving the changed code. For a backend
+  target that means watch mode, or both frames will show the same numbers.
+- What the page shows can legitimately differ from the row diff — a page may
+  round, aggregate again, or simply not display the columns that moved.
+
 ## Showing the result
 
 ```bash
