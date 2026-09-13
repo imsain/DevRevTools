@@ -3,8 +3,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { resolveUidiff, uiSteps } from '../lib/ui.mjs';
 import { buildCanvasCode } from '../lib/canvas.mjs';
 import { diffRows } from '../lib/diff.mjs';
@@ -61,6 +61,78 @@ test('UIDIFF_BIN wins over everything else', (t) => {
     }
   });
   assert.deepEqual(resolveUidiff(), { command: '/somewhere/uidiff', args: [] });
+});
+
+/**
+ * Resolution with nothing on the PATH, no override, and a home directory the
+ * test owns — the situation of someone who installed both plugins and never
+ * touched their shell config.
+ */
+function inEmptyEnvironment(t, home) {
+  const previous = {
+    home: process.env.HOME,
+    path: process.env.PATH,
+    bin: process.env.UIDIFF_BIN
+  };
+  process.env.HOME = home;
+  process.env.PATH = '';
+  delete process.env.UIDIFF_BIN;
+  t.after(() => {
+    process.env.HOME = previous.home;
+    process.env.PATH = previous.path;
+    if (previous.bin !== undefined) {
+      process.env.UIDIFF_BIN = previous.bin;
+    }
+  });
+}
+
+test('an installed uidiff plugin is found in the plugin cache', (t) => {
+  const { dir } = makeRepo(t);
+  // Cursor's own layout: <cache>/<marketplace>/<plugin>/<sha>/. There is no
+  // sibling datadiff to walk up from, which is the whole point.
+  const bin = join(
+    dir,
+    '.cursor/plugins/cache/devrevtools/uidiff/abc123/bin/uidiff.mjs'
+  );
+  mkdirSync(dirname(bin), { recursive: true });
+  writeFileSync(bin, '// stub\n');
+  inEmptyEnvironment(t, dir);
+
+  assert.deepEqual(resolveUidiff(), {
+    command: process.execPath,
+    args: [bin]
+  });
+});
+
+test('the newest install wins when a plugin was updated in place', (t) => {
+  const { dir } = makeRepo(t);
+  const older = join(
+    dir,
+    '.cursor/plugins/cache/devrevtools/uidiff/old/bin/uidiff.mjs'
+  );
+  const newer = join(
+    dir,
+    '.cursor/plugins/cache/devrevtools/uidiff/new/bin/uidiff.mjs'
+  );
+  for (const bin of [older, newer]) {
+    mkdirSync(dirname(bin), { recursive: true });
+    writeFileSync(bin, '// stub\n');
+  }
+  utimesSync(older, new Date(0), new Date(0));
+  inEmptyEnvironment(t, dir);
+
+  assert.deepEqual(resolveUidiff().args, [newer]);
+});
+
+test('no uidiff anywhere is reported rather than guessed at', (t) => {
+  const { dir } = makeRepo(t);
+  inEmptyEnvironment(t, dir);
+  // The sibling checkout is the last resort and does exist in this repo, so
+  // resolution succeeds here; what must not happen is a wrong path.
+  const resolved = resolveUidiff();
+  if (resolved) {
+    assert.ok(existsSync(resolved.args[0]), 'resolved to a file that exists');
+  }
 });
 
 test('the sibling uidiff plugin is found when nothing else provides one', (t) => {

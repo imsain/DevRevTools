@@ -10,7 +10,8 @@
 // screenshots are describing the same moment.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DataDiffError } from './project.mjs';
@@ -18,10 +19,43 @@ import { DataDiffError } from './project.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Same resolution order the skills use for their own binaries: an explicit
- * override, then the PATH, then the sibling plugin in this repo. The last one
- * is what makes `--ui` work for someone who installed the suite and never put
- * anything on their PATH.
+ * Where an installed uidiff plugin keeps its binary.
+ *
+ * Cursor and Claude each cache a plugin as `<marketplace>/<plugin>/<sha>/`,
+ * so an installed datadiff has no sibling to look at — its neighbour in the
+ * cache is a different sha directory under a different plugin name. Finding
+ * uidiff therefore means searching the cache rather than walking up from
+ * here, and taking the newest sha when a plugin has been updated in place.
+ */
+function installedUidiff() {
+  const caches = [
+    join(homedir(), '.cursor', 'plugins', 'cache'),
+    join(homedir(), '.claude', 'plugins', 'cache')
+  ].filter(existsSync);
+
+  const found = [];
+  for (const cache of caches) {
+    for (const marketplace of readdirSync(cache)) {
+      const pluginDir = join(cache, marketplace, 'uidiff');
+      if (!existsSync(pluginDir)) {
+        continue;
+      }
+      for (const sha of readdirSync(pluginDir)) {
+        const bin = join(pluginDir, sha, 'bin', 'uidiff.mjs');
+        if (existsSync(bin)) {
+          found.push({ bin, at: statSync(bin).mtimeMs });
+        }
+      }
+    }
+  }
+  return found.sort((a, b) => b.at - a.at)[0]?.bin ?? null;
+}
+
+/**
+ * An explicit override, then the PATH, then an installed uidiff plugin, then
+ * the sibling checkout. The last two are what make `--ui` work for someone
+ * who never put anything on their PATH — whether they installed the plugins
+ * or are working in this repo.
  */
 export function resolveUidiff() {
   if (process.env.UIDIFF_BIN) {
@@ -34,6 +68,10 @@ export function resolveUidiff() {
   });
   if (onPath.status === 0 && onPath.stdout.trim()) {
     return { command: onPath.stdout.trim(), args: [] };
+  }
+  const installed = installedUidiff();
+  if (installed) {
+    return { command: process.execPath, args: [installed] };
   }
   const sibling = join(here, '..', '..', 'uidiff', 'bin', 'uidiff.mjs');
   if (existsSync(sibling)) {

@@ -14,7 +14,9 @@
     "bin",
     "lib",
     "README.md",
-    "SKILL.md"
+    "SKILL.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs"
