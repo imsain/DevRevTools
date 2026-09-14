@@ -1,22 +1,18 @@
 {
-  "name": "uidiff",
+  "name": "datadiff",
   "version": "0.1.0",
-  "description": "Before/after UI screenshots and pixel diffs for a local dev server, with getBoundingClientRect measurements. macOS only. No npm dependencies; needs Chrome, git and ImageMagick.",
+  "description": "Before/after row-level diffs for a SQL query or a data-processing function, shown as a table and chart. No npm dependencies; needs git and, for SQL, snowsql.",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "uidiff": "bin/uidiff.mjs"
+    "datadiff": "bin/datadiff.mjs"
   },
   "engines": {
     "node": ">=22"
   },
-  "os": [
-    "darwin"
-  ],
   "files": [
     "bin",
     "lib",
-    "config.example.json",
     "README.md",
     "SKILL.md",
     "LICENSE",
@@ -30,10 +26,10 @@
     "url": "git+https://github.com/imsain/DevRevTools.git"
   },
   "keywords": [
-    "screenshot",
-    "visual-diff",
+    "sql",
+    "data-diff",
     "visual-regression",
-    "chrome-devtools-protocol",
+    "snowflake",
     "cli"
   ]
 }

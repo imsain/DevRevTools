@@ -8,6 +8,8 @@ they share this repo's issue tracker, CI, and contribution process.
 
 - **[uidiff](plugins/uidiff/)** — before/after UI screenshots and pixel-accurate
   diffs for a local dev server.
+- **[datadiff](plugins/datadiff/)** — before/after row-level diffs for a SQL
+  query or a data-processing function, shown as a table and chart.
 
 ## Installing a plugin
 
@@ -39,6 +41,24 @@ repo.
    `"source": "./plugins/<name>"`.
 3. Give it its own `README.md`, `CONTRIBUTING.md`, and test suite — plugins in
    this repo are otherwise independent of each other.
+4. Run `npm run sync` to give it a copy of `shared/`.
+
+## Shared code
+
+Both plugins need the same git swap, the same project and config resolution,
+the same argument parsing, and the same canvas slider. None of it can be
+imported across plugins at runtime: a plugin is installed as a directory on
+its own — the cache holds `<marketplace>/<plugin>/<sha>/` with no siblings —
+and there is no `node_modules` there to resolve a package from.
+
+So `shared/` is the only editable copy, and `npm run sync` vendors it into
+each plugin as `lib/shared/` and `test/shared/`, alongside a copy of
+`LICENSE`. Those copies are generated; edit `shared/` and re-run the sync. CI
+runs `npm run sync:check`, which fails if a copy was edited in place.
+
+What stays per-plugin is the part that genuinely differs: each binds the
+shared code to its own error type, cache directory and config defaults in its
+`lib/project.mjs`.
 
 ## License
 

@@ -293,6 +293,24 @@ sources. For the real drag-to-compare slider, open the HTML report from
 Canvas the user can open beside the chat instead of a browser tab — nicer
 when the review is happening in Cursor rather than on a PR.
 
+## Capturing one frame, when something else controls before and after
+
+```bash
+uidiff capture /dashboard --label before
+```
+
+One screenshot of the page as it is right now: no git swap, no comparison, no
+refusal. `compare` is the right command whenever the change lives in this
+repo, because it owns both states and can tell you when the change was
+invisible. `capture` exists for the case it cannot own: the code being changed
+is in a *different repo* from the server rendering the page — a backend
+transform shown by a frontend dev server — so the swap has to happen over
+there while the capture happens here. Whoever controls the two states calls
+this twice, once per state.
+
+`datadiff --ui` is the main caller. Prefer `compare` unless you specifically
+need that split.
+
 ## Showing it beside the chat instead of a browser tab
 
 ```bash

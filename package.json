@@ -1,0 +1,13 @@
+{
+  "name": "devrevtools",
+  "version": "0.1.0",
+  "description": "Developer review tools, packaged as Cursor plugins. Not published — this file exists so the repo-wide scripts have a home.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-shared.mjs",
+    "sync:check": "node scripts/sync-shared.mjs --check",
+    "test": "npm run sync:check && npm --prefix plugins/uidiff test && npm --prefix plugins/datadiff test"
+  }
+}
