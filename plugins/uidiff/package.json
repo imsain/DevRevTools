@@ -1,6 +1,6 @@
 {
   "name": "uidiff",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Before/after UI screenshots and pixel diffs for a local dev server, with getBoundingClientRect measurements. macOS only. No npm dependencies; needs Chrome, git and ImageMagick.",
   "license": "Apache-2.0",
   "type": "module",

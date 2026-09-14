@@ -1,6 +1,6 @@
 {
   "name": "datadiff",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Before/after row-level diffs for a SQL query or a data-processing function, shown as a table and chart. No npm dependencies; needs git and, for SQL, snowsql.",
   "license": "Apache-2.0",
   "type": "module",
