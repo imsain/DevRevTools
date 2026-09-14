@@ -13,18 +13,24 @@ cd DevRevTools/plugins/uidiff
 node --test test/*.test.mjs
 ```
 
-Node 21+ and git are all you need for the test suite. ImageMagick is optional
+Node 22+ and git are all you need for the test suite. ImageMagick is optional
 for it — the image tests skip themselves when it is absent — but install it
 (`brew install imagemagick`) if you're touching `lib/report.mjs` or
 `lib/wipe.mjs`, and run `uidiff compare` by hand for anything touching
 `lib/cdp.mjs` or the auth code in `lib/project.mjs`, since the automated tests
 can't reach Chrome, auth, or a dev server.
 
-The tests build throwaway git repos and commit to them, so a global
-`core.hooksPath` hook that expects a real project — a secret scanner, most
-likely — will fail them for reasons that have nothing to do with your change.
-If `git commit` is what's failing, that's why; whatever variable skips your
-hook will get the suite green.
+The tests build throwaway git repos and commit to them. Those repos point
+`core.hooksPath` at an empty directory, so a global hook that expects a real
+project — a secret scanner, most likely — cannot fail the suite for reasons
+that have nothing to do with your change.
+
+## Shared code
+
+`lib/shared/` and `test/shared/` are generated from `shared/` at the repo
+root; see that README's "Shared code" section. Edit the originals and run
+`npm run sync` from the repo root — CI fails if a vendored copy was edited in
+place.
 
 ## Testing it as a plugin
 

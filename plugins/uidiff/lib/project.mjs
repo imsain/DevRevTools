@@ -1,136 +1,61 @@
-// Project resolution, config loading, and auth cookie minting.
+// uidiff's project identity, plus auth cookie minting.
+//
+// Everything that is not specific to uidiff — finding the checkout, keying
+// its artifacts, locating and parsing a config — comes from lib/shared,
+// which is generated from shared/ at the repo root.
 
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createProject,
+  projectKey,
+  projectName,
+  readJson,
+  writeJson
+} from './shared/project.mjs';
+
+export { projectKey, projectName, readJson, writeJson };
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/**
- * Screenshots, swap backups and the minted session cookie stay outside any
- * checkout: they contain real page data and a valid token, and nothing
- * gitignored-by-luck should be the only thing keeping them out of a commit.
- *
- * Read per call rather than frozen at import so tests can point it somewhere
- * disposable without depending on module load order.
- */
-export function artifactsDir() {
-  return process.env.UIDIFF_CACHE || join(homedir(), '.cache', 'uidiff');
-}
 const COOKIE_TTL_MS = 6 * 24 * 3600 * 1000;
 
 export class UiDiffError extends Error {}
 
-export function repoRoot(cwd = process.cwd()) {
-  try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd,
-      encoding: 'utf8'
-    }).trim();
-  } catch {
-    throw new UiDiffError(`Not inside a git repository: ${cwd}`);
-  }
-}
-
-export function projectName(root) {
-  return basename(root);
-}
-
-/**
- * Where one checkout's captures go, which cannot be the directory name alone:
- * two products both cloned as `web` or `frontend` would share an output
- * directory and overwrite each other's before/after pair. The path is folded
- * in so the name stays readable and the key stays unique.
- *
- * Swap state deliberately still keys on the name alone — see stateDir.
- */
-export function projectKey(root) {
-  const digest = createHash('sha256').update(root).digest('hex').slice(0, 8);
-  return `${projectName(root)}-${digest}`;
-}
-
-/**
- * Where a project's config may live: one committed file at the root of the
- * repo being captured, and an environment variable to point somewhere else.
- *
- * One name rather than several. Keying config off the checkout's directory
- * name — the obvious alternative when the tool is vendored — breaks the moment
- * somebody clones into a differently-named folder, and settings that belong to
- * a repository should travel with it.
- */
-export function configCandidates(root) {
-  return [
-    ...(process.env.UIDIFF_CONFIG ? [resolve(process.env.UIDIFF_CONFIG)] : []),
-    join(root, '.uidiff.json')
-  ];
-}
-
-export function configPath(root) {
-  const paths = configCandidates(root);
-  return paths.find(existsSync) ?? paths[0];
-}
-
-export function loadConfig(root) {
-  const path = configPath(root);
-  if (!existsSync(path)) {
-    throw new UiDiffError(
-      [
-        'No config for this repo. Looked for:',
-        ...configCandidates(root).map((candidate) => `  ${candidate}`),
-        '',
-        'Run "uidiff init" to write one, with this project\'s dev server port',
-        'and sign-in method filled in as far as they can be detected.',
-        '',
-        `Every key it can hold is documented in ${join(ROOT, 'config.example.json')}`
-      ].join('\n')
-    );
-  }
-  let config;
-  try {
-    config = JSON.parse(readFileSync(path, 'utf8'));
-  } catch (error) {
-    throw new UiDiffError(`${path} is not valid JSON: ${error.message}`);
-  }
-  config.baseUrl ??= 'http://localhost:3000';
-  config.viewport = { width: 1440, height: 900, scale: 2, ...config.viewport };
-  config.chromePort ??= 9222;
-  config.reloadWaitMs ??= 4000;
-  config.settleMs ??= 12000;
-  return config;
-}
-
-export function outDir(root, slug) {
-  const dir = join(artifactsDir(), 'out', projectKey(root), slug);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-/**
- * Keyed on the checkout's name only, unlike outDir, because a swap manifest
- * records absolute backup paths and this directory is how `uidiff restore`
- * finds work that a crash left swapped out. Changing the key would hide an
- * older manifest from the one command whose job is to recover it.
- *
- * Two same-named checkouts sharing this is safe rather than destructive:
- * swapToRef refuses outright when it finds a manifest it did not write.
- */
-export function stateDir(root) {
-  const dir = join(artifactsDir(), 'state', projectName(root));
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-export function writeJson(path, value) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
-}
-
-export function readJson(path, fallback = null) {
-  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback;
-}
+export const {
+  artifactsDir,
+  configCandidates,
+  configPath,
+  loadConfig,
+  outDir,
+  repoRoot,
+  slugFor,
+  stateDir
+} = createProject({
+  tool: 'uidiff',
+  Err: UiDiffError,
+  applyDefaults(config) {
+    config.baseUrl ??= 'http://localhost:3000';
+    config.viewport = {
+      width: 1440,
+      height: 900,
+      scale: 2,
+      ...config.viewport
+    };
+    config.chromePort ??= 9222;
+    config.reloadWaitMs ??= 4000;
+    config.settleMs ??= 12000;
+  },
+  initHelp: [
+    'Run "uidiff init" to write one, with this project\'s dev server port',
+    'and sign-in method filled in as far as they can be detected.',
+    '',
+    `Every key it can hold is documented in ${join(ROOT, 'config.example.json')}`
+  ],
+  // A route's query and hash name the same page as far as a capture goes.
+  slug: { stripQuery: true, fallback: 'root' }
+});
 
 /**
  * One `auth.claims` entry as data: either the name of an environment variable
@@ -276,10 +201,4 @@ export function targetUrl(config, path) {
     );
   }
   return new URL(path, config.baseUrl).href;
-}
-
-/** A filesystem-safe name for a route, used for this run's output directory. */
-export function slugFor(path) {
-  const trimmed = path.split(/[?#]/)[0].replace(/^\/+|\/+$/g, '');
-  return trimmed ? trimmed.replace(/[^a-zA-Z0-9._-]+/g, '-') : 'root';
 }

@@ -8,6 +8,11 @@
       "name": "uidiff",
       "source": "./plugins/uidiff",
       "description": "Before/after UI screenshots and pixel-accurate diffs for a local dev server."
+    },
+    {
+      "name": "datadiff",
+      "source": "./plugins/datadiff",
+      "description": "Before/after row-level diffs for a SQL query or data-processing function, as a table and chart."
     }
   ]
 }

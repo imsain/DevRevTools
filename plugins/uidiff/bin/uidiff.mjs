@@ -470,6 +470,31 @@ async function commandCompare(root, config, args) {
   }
 }
 
+/**
+ * One frame, no git swap, no comparison.
+ *
+ * `compare` owns the before/after dance for a change inside this repo, which
+ * is the common case. It cannot own a change whose code lives in a different
+ * repo from the server rendering the page — a backend edit shown by a
+ * frontend dev server — because the swap has to happen over there while the
+ * capture happens here. This is the primitive for that: whoever controls the
+ * two states calls it twice.
+ */
+async function commandCapture(root, config, args) {
+  const target = targetFromArgs(config, args);
+  const label = args.flags.label ? String(args.flags.label) : 'capture';
+  const { outFile, devError } = await captureLabel({
+    root,
+    config,
+    target,
+    label
+  });
+  console.log(`capture: ${outFile}`);
+  if (devError) {
+    console.log(`  the page reported: ${devError}`);
+  }
+}
+
 async function commandMarkdown(root, config, args) {
   const path = args.positional[1];
   targetUrl(config, path);
@@ -646,6 +671,9 @@ const HELP = `uidiff — before/after UI screenshots for a local dev server
   uidiff init [--force]              write .uidiff.json for this repo
   uidiff doctor                      check config, chrome, dev server, auth
   uidiff compare <path> [--before-ref <ref>]
+  uidiff capture <path> [--label <name>]
+                                     one frame, no swap and no comparison, for
+                                     when something else controls the two states
   uidiff markdown <path> [--no-open]
   uidiff canvas <path>                open the drag-slider compare beside the
                                      chat, instead of a browser tab
@@ -737,6 +765,9 @@ async function main() {
       return;
     case 'compare':
       await commandCompare(root, config, args);
+      return;
+    case 'capture':
+      await commandCapture(root, config, args);
       return;
     case 'markdown':
       await commandMarkdown(root, config, args);

@@ -28,7 +28,7 @@ used. See "Contributing" below.
 
 ## What you need on your machine
 
-- **Node 21 or newer.** The tool has no dependencies — it uses the global
+- **Node 22 or newer.** The tool has no dependencies — it uses the global
   `fetch` and `WebSocket` that Node 21 added, and drives Chrome directly over
   the DevTools Protocol rather than through Puppeteer.
 - **Chrome or Chromium.** Found automatically in `/Applications`. Set
