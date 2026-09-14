@@ -32,6 +32,42 @@ claude plugin install uidiff
 See each plugin's own `README.md` for what it does and how to set it up in a
 repo.
 
+## Updating an installed plugin
+
+**Installs do not follow this repository.** Adding a marketplace pins it to
+the commit that was current at the time, and Cursor caches the plugin at
+`~/.cursor/plugins/cache/<marketplace>/<plugin>/<sha>/`. New commits here —
+including ones you can see on GitHub — never reach a machine that installed
+earlier. Nothing notifies anyone, and the plugin keeps working, which is what
+makes this easy to miss.
+
+The obvious command does not currently help. `cursor-agent plugin marketplace
+update devrevtools` re-indexes from Cursor's side rather than from your
+checkout, and for a marketplace added by git URL it reports success with
+`0 plugins indexed` while the cache stays where it was. That is a known Cursor
+bug, not a misuse.
+
+Removing and re-adding is what actually works:
+
+```bash
+cursor-agent plugin marketplace remove devrevtools
+cursor-agent plugin marketplace add https://github.com/imsain/DevRevTools
+```
+
+Re-adding brings back the marketplace, not your plugins, so install the ones
+you want again afterwards. Then run **Developer: Reload Window**, since
+skills are read at startup.
+
+Two things worth checking while you are in there. `cursor-agent plugin
+marketplace list` should show this repo exactly once; adding it under two
+names lists every plugin twice. And an uninstalled marketplace can leave an
+orphaned directory behind in the cache, which is harmless but confusing when
+you are working out which copy is in play.
+
+If you are changing a plugin rather than using one, skip all of this and
+symlink your checkout into `~/.cursor/plugins/local/` instead — see the
+plugin's `CONTRIBUTING.md`.
+
 ## Adding a plugin to this repo
 
 1. Create `plugins/<name>/` with its own `.cursor-plugin/plugin.json` (and
