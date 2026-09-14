@@ -52,6 +52,12 @@ import {
   pixelDiff
 } from '../lib/report.mjs';
 import { numberFlag, parseArgs } from '../lib/args.mjs';
+import {
+  detectDevCommand,
+  probe,
+  startDevServer,
+  waitUntilUp
+} from '../lib/devserver.mjs';
 import { initConfig } from '../lib/init.mjs';
 import { buildMarkdown } from '../lib/markdown.mjs';
 import { buildCanvasCode, writeCanvas } from '../lib/canvas.mjs';
@@ -285,6 +291,93 @@ function requireImageMagick(args) {
   );
 }
 
+/**
+ * Makes sure something is serving the app before spending a capture on it.
+ *
+ * A missing dev server used to be found out the slow way: Chrome photographed
+ * its own "connection refused" page twice and the run reported a tidy 0.000%
+ * diff of two identical error pages. Checking first turns that into one line
+ * before anything is captured.
+ *
+ * Starting one is opt-in. The tool refuses and names the flag rather than
+ * spawning processes nobody asked for, and a server it starts is stopped when
+ * the run ends — see lib/devserver.mjs for why it is never left running.
+ */
+async function requireDevServer(root, config, args) {
+  const { up } = await probe(config.baseUrl);
+  if (up) {
+    return null;
+  }
+
+  const detected = config.devCommand
+    ? { command: config.devCommand, cwd: join(root, config.devDir ?? '.') }
+    : detectDevCommand(root, config.auth?.appDir ?? '.');
+
+  if (!args.flags['start-server']) {
+    throw new UiDiffError(
+      [
+        `nothing is serving ${config.baseUrl}, so there is nothing to capture.`,
+        '',
+        '  Start your dev server and run this again. If the page fetches from',
+        '  a separate API, start that too — a route whose backend is down',
+        '  still produces a PNG, of an error page.',
+        '',
+        ...(detected
+          ? [
+              '  Or ask the user whether uidiff should start one, and if they',
+              '  agree add --start-server, which runs:',
+              `    ${detected.command}`,
+              `  in ${detected.cwd}, and stops it when the run finishes.`
+            ]
+          : [
+              '  No dev script was found near the root, so --start-server has',
+              '  nothing to run. Set devCommand in the config to use it.'
+            ])
+      ].join('\n')
+    );
+  }
+
+  if (!detected) {
+    throw new UiDiffError(
+      [
+        `nothing is serving ${config.baseUrl}, and no dev script was found to`,
+        '  start one. Set devCommand (and devDir, if it is not the repo root)',
+        '  in the config, or start the server yourself.'
+      ].join('\n')
+    );
+  }
+
+  const timeoutMs = numberFlag(
+    'start-timeout',
+    args.flags['start-timeout'] ?? config.startTimeoutMs ?? 120000
+  );
+  console.log(`starting dev server: ${detected.command} (in ${detected.cwd})`);
+  const server = startDevServer({
+    command: detected.command,
+    cwd: detected.cwd,
+    onExit: (code) =>
+      console.log(`  WARNING: the dev server exited on its own (code ${code}).`)
+  });
+  const ready = await waitUntilUp(config.baseUrl, {
+    timeoutMs,
+    onWait: () => console.log('  waiting for it to serve the first request...')
+  });
+  if (!ready) {
+    server.stop();
+    throw new UiDiffError(
+      [
+        `started ${detected.command} but ${config.baseUrl} did not answer`,
+        `  within ${timeoutMs}ms, so it has been stopped again.`,
+        '',
+        '  A first compile can take longer than that on a large app: raise',
+        '  --start-timeout, or start the server yourself and leave it warm.'
+      ].join('\n')
+    );
+  }
+  console.log(`dev server ready at ${config.baseUrl}`);
+  return server;
+}
+
 async function commandCompare(root, config, args) {
   const target = targetFromArgs(config, args);
   const dir = outDir(root, target.slug);
@@ -302,6 +395,7 @@ async function commandCompare(root, config, args) {
     args.flags['reload-wait'] ?? config.reloadWaitMs
   );
   const measurements = {};
+  const server = await requireDevServer(root, config, args);
 
   const after = await captureLabel({ root, config, target, label: 'after' });
   measurements.after = after.measurements;
@@ -325,6 +419,9 @@ async function commandCompare(root, config, args) {
     console.log(`restored ${count} file(s) to their pre-swap contents`);
   }
   await sleep(reloadWait);
+  // Nothing below this touches the page, so a server this run started has done
+  // its job. An interrupted or failed run stops it on the way out instead.
+  server?.stop();
 
   // Masks go on before anything is measured or cropped, and onto both frames,
   // so content that rewrites itself between the two captures stops counting.
@@ -483,12 +580,19 @@ async function commandCompare(root, config, args) {
 async function commandCapture(root, config, args) {
   const target = targetFromArgs(config, args);
   const label = args.flags.label ? String(args.flags.label) : 'capture';
-  const { outFile, devError } = await captureLabel({
-    root,
-    config,
-    target,
-    label
-  });
+  const server = await requireDevServer(root, config, args);
+  let outFile;
+  let devError;
+  try {
+    ({ outFile, devError } = await captureLabel({
+      root,
+      config,
+      target,
+      label
+    }));
+  } finally {
+    server?.stop();
+  }
   console.log(`capture: ${outFile}`);
   if (devError) {
     console.log(`  the page reported: ${devError}`);
@@ -646,14 +750,16 @@ async function commandDoctor(root, config) {
   console.log(
     `chrome: ${status.running ? `running (${status.browser})` : 'not running'} on port ${status.port}`
   );
-  try {
-    const response = await fetch(config.baseUrl, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(3000)
-    });
-    console.log(`dev server: ${config.baseUrl} -> HTTP ${response.status}`);
-  } catch (error) {
-    console.log(`dev server: ${config.baseUrl} unreachable (${error.message})`);
+  const server = await probe(config.baseUrl);
+  if (server.up) {
+    console.log(`dev server: ${config.baseUrl} -> HTTP ${server.status}`);
+  } else {
+    const detected =
+      config.devCommand ?? detectDevCommand(root, config.auth?.appDir ?? '.')?.command;
+    console.log(
+      `dev server: ${config.baseUrl} unreachable (${server.error})` +
+        (detected ? ` — "--start-server" would run "${detected}"` : '')
+    );
   }
   const cookie = authCookie(root, config);
   console.log(
@@ -698,6 +804,12 @@ const HELP = `uidiff — before/after UI screenshots for a local dev server
                                      avatars, sample data) stops counting
     --pad <px>                       padding around a --crop selector (default 24)
     --full-page                      capture the whole document, not one screenful
+
+  When no dev server is running, compare and capture stop rather than
+  photograph a connection error. To have uidiff run one for the length of
+  the run and stop it afterwards:
+    --start-server                   run the repo's dev script itself
+    --start-timeout <ms>             how long to wait for it (default 120000)
 
   compare only:
     --before-ref <ref>               the git ref to rebuild "before" from

@@ -8,7 +8,8 @@ description: >-
   an edit could change how a page looks — JSX or HTML markup, CSS, Tailwind or
   other utility classes, layout, spacing, sizing, colour, or hover and
   open/closed states — verify it and show the user the comparison without being
-  asked, as long as a local dev server is running. Also use when the user asks
+  asked, as long as a local dev server is running or the user agrees to let
+  uidiff start one. Also use when the user asks
   to see the visual effect of a UI change, wants a before/after comparison of a
   page, asks to "screenshot this before and after", mentions a visual
   regression, or needs the on-screen geometry of an element measured to
@@ -247,6 +248,28 @@ The HTTP status of the document is recorded during capture, so a 500 is caught
 without the tool knowing anything about the framework. The overlay text is a
 supplement for stacks that serve an error page with a 200; its selectors
 default to Next.js and Vite and are configurable.
+
+## When no dev server is running at all
+
+`compare` and `capture` check before capturing anything, and stop rather than
+photograph the browser's own connection-error page — which otherwise comes back
+as two identical frames and a reassuring 0.000% diff. The refusal names the
+command that would start a server:
+
+```
+uidiff: nothing is serving http://localhost:3000, so there is nothing to capture.
+
+  Or ask the user whether uidiff should start one, and if they
+  agree add --start-server, which runs:
+    yarn dev
+  in /path/to/repo/application/core, and stops it when the run finishes.
+```
+
+Do what it says: ask the user, and only add `--start-server` if they agree.
+Starting one costs the cold start plus a first compile on every run, so if
+several captures are coming, suggest they start it themselves and leave it
+warm. A server uidiff starts is stopped when the run ends; a server it finds
+already running is never touched.
 
 **Report that and stop.** Do not read the geometry — it measures the overlay —
 and do not treat the pixel diff as a result. When both frames are broken the
