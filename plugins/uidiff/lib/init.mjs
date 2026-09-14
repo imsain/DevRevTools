@@ -91,9 +91,9 @@ function readPackage(dir) {
 
 /**
  * Every package.json worth reading: the repo root and two levels below it, so
- * the usual monorepo shapes (`apps/web`, `packages/ui`, `application/core`)
- * are found without walking an entire checkout. Shallowest first, so a root
- * app wins over a nested one.
+ * the usual monorepo shapes (`apps/web`, `packages/ui`) are found without
+ * walking an entire checkout. Shallowest first, so a root app wins over a
+ * nested one.
  */
 function packagesUnder(root, depth = 2) {
   const found = [];

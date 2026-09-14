@@ -10,8 +10,13 @@
   "//settleMs": "Budget, not a duration: the page is captured as soon as it stops fetching, and this is only how long to keep waiting for that. A dev route compiling for the first time is slow, so 12000 is a safe ceiling that a healthy page will never spend. Override per run with --settle.",
   "settleMs": 12000,
 
-  "//reloadWaitMs": "How long the dev server needs to rebuild after `compare` swaps files on disk. This is a plain sleep, which suits a dev server with hot reload — the only kind this tool targets.",
+  "//reloadWaitMs": "How long the dev server needs to rebuild after `compare` swaps files on disk. This is a plain sleep, which suits a dev server with hot reload — the only kind this tool targets. It cannot be replaced by polling: an already-running server answers immediately, so a poll cannot tell you the swap has been noticed.",
   "reloadWaitMs": 5000,
+
+  "//devCommand": "Only for --start-server, and only when the detected command is wrong. By default uidiff runs the `dev` script (or `start`) through whichever package manager the lockfile commits to, in the directory holding the app's package.json. A server it starts is stopped when the run ends; one it finds already running is never touched.",
+  "//devCommand-example": "pnpm --filter web dev",
+  "//devDir": "Where devCommand runs, relative to the repo root. Defaults to the app directory uidiff detected.",
+  "//startTimeoutMs": "How long --start-server waits for the first request to be answered before giving up and stopping the server again. A large app's first compile can exceed the 120000 default.",
 
   "//fullPage": "Capture the whole document rather than one screenful. Off by default because tall pages are slower and Chrome cannot rasterise past 16384 device pixels; --full-page turns it on per run.",
   "fullPage": false,
@@ -39,7 +44,7 @@
   "//auth-nextauth-offline-example": "For a next-auth app: signs a session token with the app's own secret, so no browser and no identity provider are involved. `appDir` is where the app's package.json and node_modules live, relative to the repo root. `claims` is an optional flat map of extra JWT claims merged into the token; a string value of the form \"env:VAR_NAME\" is replaced with process.env.VAR_NAME at mint time, so a claim your app's JWT callback expects (a tenant id, an internal user id, ...) can be supplied without this tool knowing its name.",
   "//example-nextauth": {
     "mode": "nextauth-offline",
-    "appDir": "application/core",
+    "appDir": "apps/web",
     "envFile": ".env",
     "cookieName": "next-auth.session-token",
     "secretEnvVar": "AUTH_SECRET",

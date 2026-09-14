@@ -123,11 +123,27 @@ That config is the whole configuration, it holds per-repo settings only, and it
 is meant to be committed. `config.example.json` documents every key it can
 take; `init` writes only the two that have no sensible default.
 
-Start your dev server yourself; the tool never starts one and won't fight one
-you already have. **If your pages fetch from a separate API, start that too** —
-a route whose backend is down still produces a PNG, of an error page. Every
-command warns when that has happened rather than letting you read an error
-overlay as a result.
+**If your pages fetch from a separate API, start that too** — a route whose
+backend is down still produces a PNG, of an error page. Every command warns
+when that has happened rather than letting you read an error overlay as a
+result.
+
+If nothing is serving the app at all, `compare` and `capture` stop before
+spending a capture on it, and tell you the command that would start one. Add
+`--start-server` to have uidiff run that command itself — the repo's `dev`
+script, through whichever package manager the lockfile commits to — wait for
+the first request to be answered, and stop it again when the run finishes. Set
+`devCommand` (and `devDir`) in the config when the detected command is wrong,
+and raise `--start-timeout` when a first compile needs longer than two minutes.
+
+It is opt-in, and it always stops what it started. A server uidiff started is
+one it owns; a server it found is one it never touches, because from the
+outside the two are the same process on the same port. Leaving one behind would
+mean the next run finds a server nobody remembers starting, holding the port
+and serving whatever the working tree looked like when it booted. The trade is
+that `--start-server` pays the cold-start and first-compile cost every run, so
+for repeated captures you are better off starting one yourself and leaving it
+warm.
 
 ## Using it
 
