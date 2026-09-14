@@ -11,7 +11,13 @@
 //   node scripts/sync-shared.mjs           write the copies
 //   node scripts/sync-shared.mjs --check   fail if any copy is out of date
 
-import { readdirSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  mkdirSync,
+  writeFileSync
+} from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,10 +45,14 @@ function header(source) {
   ].join('\n');
 }
 
+// A plugin is a directory that ships code, which its package.json marks it as.
+// Anything else under plugins/ — a design write-up for something not built
+// yet, say — gets no vendored copies and no licence.
 function plugins() {
   return readdirSync(PLUGINS, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter((name) => existsSync(join(PLUGINS, name, 'package.json')))
     .sort();
 }
 
