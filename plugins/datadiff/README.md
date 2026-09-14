@@ -16,7 +16,9 @@ agent-facing version; this one is for setting it up on your machine.
   export directly.
 - **`typescript` in the target repo**, only if you diff a `--function` target
   written in TypeScript that uses enums, decorators, or parameter properties.
-  Plain type annotations need nothing extra.
+  Plain type annotations need nothing extra on Node 23.6+, which strips types
+  on its own; on anything older, every TypeScript target needs that
+  `typescript` install.
 
 ## Installing it
 

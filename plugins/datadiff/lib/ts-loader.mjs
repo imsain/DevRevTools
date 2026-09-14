@@ -30,6 +30,12 @@ const typescript = (() => {
   }
 })();
 
+/** Whether this Node can strip TypeScript types by itself: unflagged from
+ * 23.6, and reported here since 22.10. Undefined on anything older. */
+export function canStripTypes() {
+  return Boolean(process.features.typescript);
+}
+
 function fileFor(base) {
   if (existsSync(base) && statSync(base).isFile()) {
     return base;
@@ -100,7 +106,19 @@ export async function load(url, context, nextLoad) {
     return nextLoad(url, context);
   }
   if (!typescript) {
-    // Node's own stripping: fine for plain annotations, throws a clear
+    // `module-typescript` is Node's own stripping, and asking an older Node
+    // for it gets "Unknown module format" — true, but not a sentence anyone
+    // can act on. process.features.typescript is how a build says it can do
+    // this at all.
+    if (!canStripTypes()) {
+      throw new Error(
+        `cannot read ${fileURLToPath(url)} as TypeScript. Node ${process.version} ` +
+          'cannot strip types, and no typescript package was found in ' +
+          `${config.root}. Upgrade to Node 23.6 or newer, or add typescript ` +
+          'to that repo.'
+      );
+    }
+    // Fine for plain annotations; throws a clear
     // ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX on anything more.
     return nextLoad(url, { ...context, format: 'module-typescript' });
   }

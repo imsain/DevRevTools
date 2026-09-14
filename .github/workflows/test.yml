@@ -36,12 +36,19 @@ jobs:
 
   datadiff:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 21 is the floor package.json claims. TypeScript function targets
+        # additionally need a Node that can strip types, so those tests skip
+        # themselves on 21 and run on 24 — testing only one version would
+        # either stop checking the floor or stop checking TypeScript at all.
+        node-version: ['21', '24']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '21'
+          node-version: ${{ matrix.node-version }}
 
       - run: npm test
         working-directory: plugins/datadiff

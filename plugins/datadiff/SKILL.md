@@ -105,6 +105,10 @@ Node's own stripping, but an `enum` or a decorator anywhere in the import graph
 fails with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`. Installing `typescript` in that
 repo is the fix.
 
+That stripping fallback needs Node 23.6 or newer. On an older Node a
+TypeScript target says so and names both ways out — upgrade Node, or install
+`typescript` in the target repo.
+
 Type *checking* never happens — only stripping and transpilation. A target
 that does not compile cleanly still runs, exactly as it would under `tsx`.
 

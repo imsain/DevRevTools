@@ -8,8 +8,16 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runFunction } from '../lib/function.mjs';
+import { canStripTypes } from '../lib/ts-loader.mjs';
 import { parseTsconfigJson, resolutionFor } from '../lib/tsconfig.mjs';
 import { makeRepo } from './helpers.mjs';
+
+// These fixtures are throwaway repos with no typescript of their own, so
+// running them needs a Node that can strip types. The resolution tests above
+// them do not, and still run everywhere the plugin claims to work.
+const needsStripping = canStripTypes()
+  ? false
+  : `Node ${process.version} cannot strip TypeScript types`;
 
 test('tsconfig with comments and a trailing comma still parses', () => {
   const parsed = parseTsconfigJson(`{
@@ -53,7 +61,7 @@ test('an extended tsconfig contributes its paths', (t) => {
   assert.equal(paths[0].prefix, '@app/');
 });
 
-test('runs a TypeScript function with type annotations', async (t) => {
+test('runs a TypeScript function with type annotations', { skip: needsStripping }, async (t) => {
   const { dir } = makeRepo(t);
   const file = join(dir, 'transform.ts');
   writeFileSync(
@@ -68,7 +76,7 @@ export function scale(rows: Row[]): Row[] {
   assert.deepEqual(output, [{ id: 1, amount: 10 }]);
 });
 
-test('resolves a tsconfig path alias and an extension-less relative import', async (t) => {
+test('resolves a tsconfig path alias and an extension-less relative import', { skip: needsStripping }, async (t) => {
   const { dir } = makeRepo(t);
   writeFileSync(
     join(dir, 'tsconfig.json'),
