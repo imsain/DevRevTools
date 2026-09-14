@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '21'
+          node-version: '24'
 
       - run: node scripts/sync-shared.mjs --check
 
@@ -26,7 +26,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '21'
+          # The floor package.json claims, so the suite proves it.
+          node-version: '22.0'
 
       - name: Install ImageMagick
         run: brew install imagemagick
@@ -38,11 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # 21 is the floor package.json claims. TypeScript function targets
-        # additionally need a Node that can strip types, so those tests skip
-        # themselves on 21 and run on 24 — testing only one version would
-        # either stop checking the floor or stop checking TypeScript at all.
-        node-version: ['21', '24']
+        # 22 is the floor package.json claims. TypeScript function targets
+        # additionally need a Node that strips types, which 22.0 does not and
+        # 22.18 and 24 do — so those tests skip themselves on the floor.
+        # Testing one version would mean dropping either the floor or
+        # TypeScript.
+        node-version: ['22.0', '24']
     steps:
       - uses: actions/checkout@v4
 

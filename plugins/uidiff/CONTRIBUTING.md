@@ -13,7 +13,7 @@ cd DevRevTools/plugins/uidiff
 node --test test/*.test.mjs
 ```
 
-Node 21+ and git are all you need for the test suite. ImageMagick is optional
+Node 22+ and git are all you need for the test suite. ImageMagick is optional
 for it — the image tests skip themselves when it is absent — but install it
 (`brew install imagemagick`) if you're touching `lib/report.mjs` or
 `lib/wipe.mjs`, and run `uidiff compare` by hand for anything touching

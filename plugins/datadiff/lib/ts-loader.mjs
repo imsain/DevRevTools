@@ -30,8 +30,9 @@ const typescript = (() => {
   }
 })();
 
-/** Whether this Node can strip TypeScript types by itself: unflagged from
- * 23.6, and reported here since 22.10. Undefined on anything older. */
+/** Whether this Node can strip TypeScript types by itself: unflagged in 23.6
+ * and backported to 22.18, flagged from 22.6, absent before that. Asking the
+ * runtime beats comparing version numbers against that history. */
 export function canStripTypes() {
   return Boolean(process.features.typescript);
 }
@@ -114,8 +115,8 @@ export async function load(url, context, nextLoad) {
       throw new Error(
         `cannot read ${fileURLToPath(url)} as TypeScript. Node ${process.version} ` +
           'cannot strip types, and no typescript package was found in ' +
-          `${config.root}. Upgrade to Node 23.6 or newer, or add typescript ` +
-          'to that repo.'
+          `${config.root}. Upgrade to Node 22.18 or 23.6 — both strip types ` +
+          'by default — or add typescript to that repo.'
       );
     }
     // Fine for plain annotations; throws a clear

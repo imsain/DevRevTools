@@ -8,7 +8,7 @@
     "datadiff": "bin/datadiff.mjs"
   },
   "engines": {
-    "node": ">=21"
+    "node": ">=22"
   },
   "files": [
     "bin",

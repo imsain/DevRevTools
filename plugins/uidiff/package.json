@@ -8,7 +8,7 @@
     "uidiff": "bin/uidiff.mjs"
   },
   "engines": {
-    "node": ">=21"
+    "node": ">=22"
   },
   "os": [
     "darwin"

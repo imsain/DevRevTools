@@ -10,15 +10,15 @@ agent-facing version; this one is for setting it up on your machine.
 
 - **git.** The "before" state is rebuilt by swapping the query or function
   file to a ref, same trick `uidiff` uses for screenshots.
-- **Node 21+.**
+- **Node 22+.**
 - **`snowsql`**, only if you diff a `--query` target. A `--function` target
   needs nothing beyond Node — it imports the module and calls the named
   export directly.
 - **`typescript` in the target repo**, only if you diff a `--function` target
   written in TypeScript that uses enums, decorators, or parameter properties.
-  Plain type annotations need nothing extra on Node 23.6+, which strips types
-  on its own; on anything older, every TypeScript target needs that
-  `typescript` install.
+  Plain type annotations need nothing extra on a Node that strips types by
+  default (22.18+ or 23.6+); on anything older, every TypeScript target needs
+  that `typescript` install.
 
 ## Installing it
 

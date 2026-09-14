@@ -12,7 +12,7 @@ cd DevRevTools/plugins/datadiff
 node --test test/*.test.mjs
 ```
 
-Node 21+ and git are all the test suite needs. `snowsql` is only used by real
+Node 22+ and git are all the test suite needs. `snowsql` is only used by real
 SQL targets, which the tests do not run — they exercise the parsing and diffing
 around it. For anything touching `lib/sql.mjs`, run a real `datadiff compare`
 against a query by hand.
