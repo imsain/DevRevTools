@@ -12,11 +12,9 @@ import { join } from 'node:path';
 import { buildCanvasCode, pngSize, workspaceSlug } from '../lib/canvas.mjs';
 
 test('workspace slug matches Cursor\'s own ~/.cursor/projects naming', () => {
-  assert.equal(workspaceSlug('/Users/Sai_Im/PAM/UIDiff'), 'Users-Sai-Im-PAM-UIDiff');
-  assert.equal(
-    workspaceSlug('/Users/Sai_Im/PAM/pam-core_frontend'),
-    'Users-Sai-Im-PAM-pam-core-frontend'
-  );
+  assert.equal(workspaceSlug('/Users/dev/work/uidiff'), 'Users-dev-work-uidiff');
+  // Underscores collapse to dashes the same way separators do.
+  assert.equal(workspaceSlug('/Users/dev/work/acme_dashboard'), 'Users-dev-work-acme-dashboard');
 });
 
 /** A PNG with a real signature and IHDR, but no image data — enough for pngSize. */

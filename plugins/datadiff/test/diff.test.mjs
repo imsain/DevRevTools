@@ -92,11 +92,11 @@ test('an added or removed row still counts toward the column total', () => {
 });
 
 test('a percentage column is averaged, not summed', () => {
-  const before = [{ id: 1, WOMEN_PERCENT: 40 }, { id: 2, WOMEN_PERCENT: 60 }];
-  const after = [{ id: 1, WOMEN_PERCENT: 30 }, { id: 2, WOMEN_PERCENT: 60 }];
+  const before = [{ id: 1, MARGIN_PERCENT: 40 }, { id: 2, MARGIN_PERCENT: 60 }];
+  const after = [{ id: 1, MARGIN_PERCENT: 30 }, { id: 2, MARGIN_PERCENT: 60 }];
   const summary = numericColumnSummary(before, after, ['id']);
   assert.deepEqual(summary, [
-    { column: 'WOMEN_PERCENT', kind: 'average', before: 50, after: 45 }
+    { column: 'MARGIN_PERCENT', kind: 'average', before: 50, after: 45 }
   ]);
 });
 

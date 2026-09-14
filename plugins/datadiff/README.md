@@ -75,7 +75,7 @@ relies on — `tsconfig.json` `baseUrl` and `paths` aliases (following
 that Node's own type-stripping rejects:
 
 ```bash
-datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath --input fixtures/rows.json
+datadiff compare --function apps/reports/src/totals.ts#totalsByRegion --input fixtures/rows.json
 ```
 
 Enums and decorators need the repo's own `typescript` installed; without it,
@@ -89,10 +89,10 @@ that page before and after the same swap the row diff used, through the
 `uidiff` CLI, and puts the drag-slider in the same canvas as the table:
 
 ```bash
-datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath \
+datadiff compare --function apps/reports/src/totals.ts#totalsByRegion \
   --input fixtures/rows.json \
-  --ui /fpm/dashboard \
-  --ui-root ../pam-core_frontend \
+  --ui /reports/overview \
+  --ui-root ../web-client \
   --ui-reload-wait 40000
 ```
 

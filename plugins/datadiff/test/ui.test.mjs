@@ -161,13 +161,13 @@ test('captured frames become a slider in the same canvas as the table', (t) => {
     diff,
     summary: [],
     ui: {
-      route: '/fpm/dashboard',
+      route: '/reports/overview',
       before: fakePng(join(dir, 'b.png'), 2880, 1800),
       after: fakePng(join(dir, 'a.png'), 2880, 1800)
     }
   });
 
-  assert.match(code, /<Slider label=\{"\/fpm\/dashboard"\}/);
+  assert.match(code, /<Slider label=\{"\/reports\/overview"\}/);
   assert.match(code, /width=\{2880\} height=\{1800\}/);
   assert.match(code, /const uiBefore = "data:image\/png;base64,/);
   // The slider needs these, and an unused import is a canvas that won't build.

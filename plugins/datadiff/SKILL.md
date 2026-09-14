@@ -88,7 +88,7 @@ reports the same thing both times rather than leaking "before" into "after".
 `--function` takes a `.ts` file directly:
 
 ```bash
-datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath --input fixtures/rows.json
+datadiff compare --function apps/reports/src/totals.ts#totalsByRegion --input fixtures/rows.json
 ```
 
 The repo's own resolution rules are honoured, which is what makes real
@@ -115,9 +115,9 @@ that does not compile cleanly still runs, exactly as it would under `tsx`.
 ## Showing the page the data feeds
 
 ```bash
-datadiff compare --function apps/fpm/src/utils.ts#calHeadcountByPath \
+datadiff compare --function apps/reports/src/totals.ts#totalsByRegion \
   --input fixtures/rows.json \
-  --ui /fpm/dashboard --ui-root ../pam-core_frontend --ui-reload-wait 40000
+  --ui /reports/overview --ui-root ../web-client --ui-reload-wait 40000
 ```
 
 `--ui <route>` captures that route before and after the *same* swap the data
@@ -162,7 +162,7 @@ plus a bar chart of any numeric column whose before/after total moved — the
 part a table alone doesn't make legible when a lot of rows changed by a
 little. Percentage and rate columns are averaged and listed separately
 instead of charted, since summing them produces a meaningless number and
-plotting one next to a headcount hides it against the axis.
+plotting one next to a large total hides it against the axis.
 Link the printed path so the user can open it, e.g.
 `[Diff](/absolute/path/to/datadiff-....canvas.tsx)`.
 

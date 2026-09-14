@@ -8,7 +8,7 @@ import { buildCanvasCode, workspaceSlug } from '../lib/canvas.mjs';
 import { diffRows, numericColumnSummary } from '../lib/diff.mjs';
 
 test('workspace slug matches Cursor\'s ~/.cursor/projects naming', () => {
-  assert.equal(workspaceSlug('/Users/al_ex/PAM/app'), 'Users-al-ex-PAM-app');
+  assert.equal(workspaceSlug('/Users/dev/work/acme_dashboard'), 'Users-dev-work-acme-dashboard');
 });
 
 test('title and meta are JSX expressions, not literal quoted text', () => {
@@ -68,16 +68,16 @@ test('a changed cell shows what the value changed from, not just to', () => {
 });
 
 test('a percentage column is kept out of the bar chart and shown as a stat', () => {
-  const before = [{ id: 1, HEADCOUNT: 100, WOMEN_PERCENT: 40 }];
-  const after = [{ id: 1, HEADCOUNT: 112, WOMEN_PERCENT: 35 }];
+  const before = [{ id: 1, UNITS: 100, MARGIN_PERCENT: 40 }];
+  const after = [{ id: 1, UNITS: 112, MARGIN_PERCENT: 35 }];
   const diff = diffRows({ before, after, key: 'id' });
   const summary = numericColumnSummary(before, after, ['id']);
   const code = buildCanvasCode({ target: 'q', meta: 'demo', diff, summary });
 
   const chart = code.slice(code.indexOf('<BarChart'), code.indexOf('</Stack>', code.indexOf('<BarChart')));
-  assert.match(chart, /HEADCOUNT/);
-  assert.doesNotMatch(chart, /WOMEN_PERCENT/);
-  assert.match(code, /WOMEN_PERCENT \(average\)/);
+  assert.match(chart, /UNITS/);
+  assert.doesNotMatch(chart, /MARGIN_PERCENT/);
+  assert.match(code, /MARGIN_PERCENT \(average\)/);
 });
 
 test('a nested object cell shows its contents, not [object Object]', () => {
