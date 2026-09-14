@@ -249,6 +249,12 @@ without the tool knowing anything about the framework. The overlay text is a
 supplement for stacks that serve an error page with a 200; its selectors
 default to Next.js and Vite and are configurable.
 
+**Report that and stop.** Do not read the geometry — it measures the overlay —
+and do not treat the pixel diff as a result. When both frames are broken the
+diff is 0, which is why the innocent "identical captures" explanation is
+suppressed in that case: it would send the reader hunting for an invisible
+change instead of a dead server.
+
 ## When no dev server is running at all
 
 `compare` and `capture` check before capturing anything, and stop rather than
@@ -262,7 +268,7 @@ uidiff: nothing is serving http://localhost:3000, so there is nothing to capture
   Or ask the user whether uidiff should start one, and if they
   agree add --start-server, which runs:
     yarn dev
-  in /path/to/repo/application/core, and stops it when the run finishes.
+  in /path/to/repo/apps/web, and stops it when the run finishes.
 ```
 
 Do what it says: ask the user, and only add `--start-server` if they agree.
@@ -270,12 +276,6 @@ Starting one costs the cold start plus a first compile on every run, so if
 several captures are coming, suggest they start it themselves and leave it
 warm. A server uidiff starts is stopped when the run ends; a server it finds
 already running is never touched.
-
-**Report that and stop.** Do not read the geometry — it measures the overlay —
-and do not treat the pixel diff as a result. When both frames are broken the
-diff is 0, which is why the innocent "identical captures" explanation is
-suppressed in that case: it would send the reader hunting for an invisible
-change instead of a dead server.
 
 ## Putting the comparison in a PR
 

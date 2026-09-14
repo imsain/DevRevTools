@@ -44,7 +44,7 @@
   "//auth-nextauth-offline-example": "For a next-auth app: signs a session token with the app's own secret, so no browser and no identity provider are involved. `appDir` is where the app's package.json and node_modules live, relative to the repo root. `claims` is an optional flat map of extra JWT claims merged into the token; a string value of the form \"env:VAR_NAME\" is replaced with process.env.VAR_NAME at mint time, so a claim your app's JWT callback expects (a tenant id, an internal user id, ...) can be supplied without this tool knowing its name.",
   "//example-nextauth": {
     "mode": "nextauth-offline",
-    "appDir": "application/core",
+    "appDir": "apps/web",
     "envFile": ".env",
     "cookieName": "next-auth.session-token",
     "secretEnvVar": "AUTH_SECRET",
