@@ -1,6 +1,6 @@
 {
   "name": "devrevtools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Developer review tools, packaged as Cursor plugins. Not published — this file exists so the repo-wide scripts have a home.",
   "license": "Apache-2.0",
   "private": true,

@@ -1,7 +1,7 @@
 {
   "name": "datadiff",
   "description": "Runs a SQL query or a data-processing function before and after a code change, and shows the row-level difference as a table plus a chart of any numeric column whose total moved. Rebuilds the \"before\" state by swapping the query or function file to a git ref. No npm dependencies; SQL needs snowsql on PATH.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Sai Im"
   },
