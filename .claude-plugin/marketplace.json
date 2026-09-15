@@ -3,6 +3,9 @@
   "owner": {
     "name": "Sai Im"
   },
+  "metadata": {
+    "description": "Developer-productivity plugins: visual diffing, and more to come."
+  },
   "plugins": [
     {
       "name": "uidiff",
