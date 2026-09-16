@@ -32,8 +32,11 @@ export const {
   tool: 'datadiff',
   Err: DataDiffError,
   applyDefaults(config) {
+    // No default way of running SQL: which one a repo means is worked out from
+    // what it configured (see resolveSqlMode), and defaulting to a CLI here
+    // would make "not configured" indistinguishable from "use snowsql".
     config.sql ??= {};
-    config.sql.cli ??= 'snowsql';
+    config.sql.mode ??= 'auto';
     config.rowLimit ??= 500;
   },
   initHelp: ['Run "datadiff init" to write one.'],
