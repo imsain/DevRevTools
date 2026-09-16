@@ -12,10 +12,13 @@ cd DevRevTools/plugins/datadiff
 node --test test/*.test.mjs
 ```
 
-Node 22+ and git are all the test suite needs. `snowsql` is only used by real
-SQL targets, which the tests do not run — they exercise the parsing and diffing
-around it. For anything touching `lib/sql.mjs`, run a real `datadiff compare`
-against a query by hand.
+Node 22+ and git are all the test suite needs. No warehouse is involved: the
+MCP tests stand up a local HTTP server that speaks enough of the protocol to
+answer a query, and the command-template tests use `node -e` as the "CLI", so
+the transport, the tool discovery and the output parsing are all covered
+without credentials. What the suite cannot cover is a specific vendor's server
+— for anything touching `lib/mcp.mjs`, run `datadiff doctor` against a real
+one, which connects and names the tool it would use.
 
 The tests build throwaway git repos and commit to them. Those repos point
 `core.hooksPath` at an empty directory, so a global hook that expects a real

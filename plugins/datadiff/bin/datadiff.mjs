@@ -29,7 +29,8 @@ import {
 } from '../lib/project.mjs';
 import { numberFlag, paramFlags, parseArgs } from '../lib/args.mjs';
 import { hasPendingSwap, restoreSwap, swapToRef } from '../lib/gitswap.mjs';
-import { runQuery, fillParams } from '../lib/sql.mjs';
+import { runQuery, fillParams, resolveSqlMode } from '../lib/sql.mjs';
+import { describeMcp } from '../lib/mcp.mjs';
 import { parseFunctionTarget, readInput, runFunction } from '../lib/function.mjs';
 import { diffRows, numericColumnSummary } from '../lib/diff.mjs';
 import { buildCanvasCode, writeCanvas } from '../lib/canvas.mjs';
@@ -75,7 +76,7 @@ function targetFromArgs(root, args) {
 async function runTarget(root, config, target, args) {
   if (target.kind === 'query') {
     const sql = fillParams(readFileSync(target.absolute, 'utf8'), paramFlags(args));
-    return runQuery(config, sql);
+    return runQuery(root, config, sql);
   }
   const input = readInput(args.flags.input);
   return runFunction(target.absolute, target.exportName, input, root);
@@ -213,29 +214,109 @@ function commandInit(root, args) {
   if (existsSync(path) && !args.flags.force) {
     throw new DataDiffError(`${path} already exists. Pass --force to overwrite.`);
   }
+  // Written with all three ways present and commented, rather than one filled
+  // in, because which one a repo wants depends on how it already reaches its
+  // warehouse — and a config that silently prefers the wrong one is harder to
+  // notice than one that refuses until a choice is made.
   writeJson(path, {
-    '//': 'datadiff settings for this repo.',
+    '//': 'datadiff settings for this repo. A --function target needs no sql block.',
+    '//sql.mode':
+      'Which way to run a --query target: mcp, command, snowsql, or auto (the default: whichever one below is configured).',
     sql: {
-      cli: 'snowsql',
-      connection: 'REPLACE_ME — a -c connection name from ~/.snowsql/config'
+      mode: 'auto',
+
+      '//mcp':
+        'Preferred. Runs the query through an MCP server that exposes a SQL tool. Use configPath + server to borrow the entry your IDE already uses, so the URL and token live in one place; or set url and tokenEnvVar here directly. tool/argument are only needed when the server names them unusually.',
+      '//mcp-example': {
+        configPath: '.cursor/mcp.json',
+        server: 'snowflake'
+      },
+
+      '//command':
+        'The escape hatch, and how to use any other warehouse: a command template. {{query}} is the statement, {{queryFile}} a temp file holding it, {{connection}} the value below. Set outputFormat to "json" if it prints a JSON array instead of CSV.',
+      '//command-examples': [
+        'snowsql -c {{connection}} -q {{query}} -o output_format=csv -o header=true -o timing=false -o friendly=false -o exit_on_error=true',
+        'psql -d {{connection}} -f {{queryFile}} --csv',
+        'bq query --format=csv --use_legacy_sql=false {{query}}',
+        './scripts/run-query.sh {{queryFile}}'
+      ],
+
+      '//connection':
+        'A -c connection name from ~/.snowsql/config, for snowsql mode or for {{connection}} above.'
     },
     rowLimit: 500
   });
   console.log(`wrote ${path}`);
-  console.log('Fill in sql.connection, then run "datadiff doctor".');
+  console.log(
+    'Choose how SQL runs: point sql.mcp at an MCP server, or set sql.command,'
+  );
+  console.log('or set sql.connection for snowsql. Then run "datadiff doctor".');
+}
+
+/** Whether a program can be found, without running it — a SQL CLI invoked
+ * with the wrong probe flag can open a prompt and hang. */
+function onPath(program) {
+  return spawnSync('which', [program], { encoding: 'utf8' }).status === 0;
+}
+
+/** Every line of a message under the heading it belongs to, since the useful
+ * half of these is usually the part after the first line. */
+function detail(message) {
+  for (const line of String(message).split('\n')) {
+    console.log(line.startsWith('  ') ? line : `  ${line}`);
+  }
+}
+
+async function reportSqlSetup(root, config) {
+  let mode;
+  try {
+    mode = resolveSqlMode(config);
+  } catch (error) {
+    console.log('sql: not configured — a --query target would refuse');
+    detail(error.message);
+    return;
+  }
+  console.log(
+    `sql mode: ${mode}${config.sql?.mode === 'auto' ? ' (auto-detected)' : ''}`
+  );
+
+  if (mode === 'mcp') {
+    try {
+      const found = await describeMcp(root, config.sql.mcp ?? {});
+      console.log(`  server: ${found.url}`);
+      console.log(
+        `  answers: yes${found.server ? ` (${found.server})` : ''}, ${found.tools.length} tool(s)`
+      );
+      console.log(`  queries would run through: ${found.tool}`);
+    } catch (error) {
+      console.log('  unreachable or unusable:');
+      detail(error.message);
+    }
+    return;
+  }
+
+  if (mode === 'command') {
+    const program = String(config.sql.command).trim().split(/\s+/)[0];
+    console.log(`  command: ${config.sql.command}`);
+    console.log(
+      `  ${program}: ${onPath(program) ? 'on PATH' : 'not found on PATH'}`
+    );
+    console.log(`  output read as: ${config.sql.outputFormat ?? 'csv'}`);
+    return;
+  }
+
+  const cli = config.sql?.cli ?? 'snowsql';
+  console.log(`  ${cli}: ${onPath(cli) ? 'on PATH' : 'not found on PATH'}`);
+  const connection = config.sql?.connection;
+  console.log(
+    `  sql.connection: ${connection && !String(connection).startsWith('REPLACE_ME') ? connection : 'not set — edit .datadiff.json'}`
+  );
 }
 
 async function commandDoctor(root, config) {
   console.log(`repo: ${root}`);
   console.log(`config: ${configPath(root)}`);
-  const cli = config.sql?.cli ?? 'snowsql';
-  const version = spawnSync(cli, ['-v'], { encoding: 'utf8' });
-  console.log(
-    `${cli}: ${version.status === 0 ? 'installed' : 'not found on PATH'}`
-  );
-  console.log(
-    `sql.connection: ${config.sql?.connection && !config.sql.connection.startsWith('REPLACE_ME') ? config.sql.connection : 'not set — edit .datadiff.json'}`
-  );
+  await reportSqlSetup(root, config);
   if (hasPendingSwap(root)) {
     console.log('WARNING: an unrestored git swap exists. Run "datadiff restore".');
   }
@@ -253,6 +334,11 @@ const HELP = `datadiff — before/after diffs for a SQL query or a data-processi
   --before-ref <ref>   the git ref to rebuild "before" from (default HEAD)
   --key <column>       match rows by this column instead of position
   --param k=v           fills {{k}} placeholders in a --query file, repeatable
+
+  A --query target runs whichever way .datadiff.json configures: through an MCP
+  server that exposes a SQL tool (including the one your IDE already uses), a
+  command template for any other warehouse or a repo's own script, or snowsql.
+  "datadiff doctor" says which one is in play. A --function target needs none.
 
   --ui <route>         also capture that route before and after, via uidiff,
                        and put the drag-slider in the same canvas as the table

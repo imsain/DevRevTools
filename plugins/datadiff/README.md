@@ -11,9 +11,11 @@ agent-facing version; this one is for setting it up on your machine.
 - **git.** The "before" state is rebuilt by swapping the query or function
   file to a ref, same trick `uidiff` uses for screenshots.
 - **Node 22+.**
-- **`snowsql`**, only if you diff a `--query` target. A `--function` target
-  needs nothing beyond Node — it imports the module and calls the named
-  export directly.
+- **Some way to run SQL**, only if you diff a `--query` target: an MCP server
+  that exposes a SQL tool, any CLI you can name in a command template, or
+  `snowsql`. See [How the SQL runs](#how-the-sql-runs). A `--function` target
+  needs nothing beyond Node — it imports the module and calls the named export
+  directly.
 - **`typescript` in the target repo**, only if you diff a `--function` target
   written in TypeScript that uses enums, decorators, or parameter properties.
   Plain type annotations need nothing extra on a Node that strips types by
@@ -34,16 +36,69 @@ cd <repo>
 datadiff init      # writes .datadiff.json
 ```
 
-Fill in `sql.connection` with a `-c` connection name from
-`~/.snowsql/config` if you'll diff SQL queries. Skip this entirely if you'll
-only diff `--function` targets — they need no config.
+Then choose how SQL runs — the file `init` writes documents all three ways
+inline. Skip this entirely if you'll only diff `--function` targets; they need
+no config.
 
 ```bash
 datadiff doctor
 ```
 
-Confirms `snowsql` is on `PATH`, the connection name is set, and there's no
-leftover git swap from an interrupted run.
+Says which way SQL runs and whether it actually works: for an MCP server it
+connects and names the tool your queries would go through, for a command
+template it checks the program is on `PATH`, for `snowsql` it checks the CLI
+and the connection name. It also reports a leftover git swap from an
+interrupted run.
+
+## How the SQL runs
+
+The connection isn't this tool's to own. If you can already query your
+warehouse, you have some way of doing it, and `datadiff` would rather borrow
+that than add a second set of credentials that can go stale independently.
+Pick one of three in `.datadiff.json`:
+
+**An MCP server** (`sql.mcp`) — preferred when you have one. If your IDE is
+already wired to a SQL-capable MCP server, borrow that entry:
+
+```json
+{ "sql": { "mcp": { "configPath": ".cursor/mcp.json", "server": "snowflake" } } }
+```
+
+The endpoint and token stay in `mcp.json`, in one place. Or name a server
+directly with `url` and `tokenEnvVar`; the token is always read from the
+environment, never stored in `.datadiff.json`.
+
+This works from a plain terminal, not just inside an agent, because a managed
+MCP server is an HTTPS endpoint with a token rather than a process the agent
+owns — the request the IDE makes is one this CLI can make too. `datadiff`
+initializes, lists the server's tools, picks its plain SQL-execution tool, and
+passes the statement as whatever argument that tool's schema names. Both
+JSON-body and SSE responses are handled, since which one you get is the
+server's choice. When a server names things unusually, `sql.mcp.tool` and
+`sql.mcp.argument` pin them down — and the error lists what the server
+actually offers rather than guessing.
+
+**A command template** (`sql.command`) — for any other warehouse, or for a
+script in your repo that already knows how to authenticate:
+
+```json
+{ "sql": { "command": "psql -d {{connection}} -f {{queryFile}} --csv" } }
+```
+
+`{{query}}` is the statement, `{{queryFile}}` a temp file holding it (written
+outside the checkout, so a stray `git add` can't reach it), `{{connection}}`
+the configured connection name. Output is read as CSV with a header row, or as
+a JSON array when `sql.outputFormat` is `"json"`. A failing command reports
+its own stderr rather than returning an empty result.
+
+**`snowsql`** (`sql.connection`) — the original path, unchanged: a `-c`
+connection name from `~/.snowsql/config`.
+
+`sql.mode` forces one of `mcp`, `command` or `snowsql` when a repo has more
+than one configured. The default, `auto`, takes the most specific thing
+present as the intent. With none of them configured a `--query` target refuses
+and names all three, rather than defaulting to a CLI that may not be
+installed.
 
 ## Diffing a query
 
@@ -118,9 +173,13 @@ Narrow on purpose, same spirit as `uidiff`:
 - Tabular output only really diffs meaningfully — a query or function that
   returns an array of objects. A scalar or a single nested object still
   works, but is shown as one row rather than a real table.
-- SQL support is `snowsql` only for now. Adding another warehouse means
-  another thin `lib/sql.mjs`-style wrapper around its own CLI, not a driver
-  dependency.
+- An MCP server has to be a remote HTTP one. A local stdio server is a process
+  the agent owns, which a separate CLI can't speak to, and that's refused with
+  an explanation rather than attempted.
+- What a SQL tool puts inside an MCP result isn't fixed by the spec, so JSON
+  and CSV are both tried. Anything else is reported with a sample of what came
+  back — never read as zero rows, since a diff of nothing against nothing is
+  the one answer this tool must not give.
 - A canvas embeds every row inline, so a huge result is capped at
   `rowLimit` (default 500, set in `.datadiff.json`) before it's shown —
   the console output from `compare` itself is always exact and uncapped.

@@ -38,8 +38,8 @@ datadiff() {
 ## First run in a repo
 
 ```bash
-datadiff init      # writes .datadiff.json — fill in sql.connection if using SQL
-datadiff doctor     # checks snowsql, config, and any pending swap
+datadiff init      # writes .datadiff.json — then choose how SQL runs
+datadiff doctor     # says which way SQL runs, and whether it works
 ```
 
 `init` is only needed for the SQL path — a `--function` target needs no
@@ -61,9 +61,52 @@ datadiff compare --query path/to/query.sql --key id
 - `--before-ref <ref>` picks what "before" means (default `HEAD`, i.e. the
   working tree vs. the last commit — the change in progress).
 
-The SQL itself runs via `snowsql -c <connection>`, the connection named in
-`.datadiff.json`'s `sql.connection` — configure that once per repo the same
-way `uidiff` records a dev-server port.
+## How the SQL actually runs
+
+The connection is not this tool's to own: a team that can already query its
+warehouse has some way of doing it, and `datadiff` borrows that rather than
+adding a second credential path. `.datadiff.json` picks one of three ways, and
+`datadiff doctor` prints which one is in play.
+
+**Preferred — an MCP server** (`sql.mcp`). If the repo's IDE is already wired
+to a SQL-capable MCP server, point at that same entry and nothing is
+duplicated:
+
+```json
+{ "sql": { "mcp": { "configPath": ".cursor/mcp.json", "server": "snowflake" } } }
+```
+
+The URL and token stay in `mcp.json`, so rotating the token does not leave
+`datadiff` pointing at a stale one. A server can also be named directly with
+`url` plus `tokenEnvVar`. This works from the terminal as well as inside an
+agent, because a managed MCP server is an HTTPS endpoint rather than a process
+the agent owns — no agent session is required.
+
+`datadiff` picks the server's plain SQL-execution tool and passes the
+statement as whatever argument that tool's own schema names. When a server
+exposes something unusual, `sql.mcp.tool` and `sql.mcp.argument` pin it down;
+the error lists the available tools rather than guessing.
+
+**Any other warehouse, or a repo's own script** (`sql.command`). A command
+template, where `{{query}}` is the statement, `{{queryFile}}` a temp file
+holding it, and `{{connection}}` the configured connection name:
+
+```json
+{ "sql": { "command": "psql -d {{connection}} -f {{queryFile}} --csv" } }
+```
+
+Output is read as CSV with a header row, or as a JSON array of rows when
+`sql.outputFormat` is `"json"`. This is the escape hatch: if the repo has a
+script that knows how to authenticate, name the script.
+
+**snowsql** (`sql.connection`). The original path, still supported: a `-c`
+connection name from `~/.snowsql/config`.
+
+If none of the three is configured, a `--query` target refuses and names all
+three rather than assuming a CLI the machine may not have. Do not reach for
+`sql.command` with a hand-written `snowsql` line when `sql.connection` already
+works, and do not add `sql.mcp` on the user's behalf without asking — it
+points at a credential.
 
 ## Diffing a data-processing function
 
@@ -176,6 +219,15 @@ Same principle as `uidiff` refusing to screenshot an invisible change:
 `compare` says `identical: nothing differs...` and stops, rather than saving
 or showing a diff, when before and after produce exactly the same rows.
 Report that to the user instead of treating it as a result.
+
+Two more refusals come from the SQL side, and both are better news than the
+alternative. A repo with no way to run SQL configured is refused before
+anything runs, naming the three options rather than trying a CLI that may not
+be installed. And a result that cannot be read as rows — an MCP tool that
+answered `Query OK` instead of data, say — is refused with a sample of what
+came back, rather than being treated as zero rows. Zero rows against zero rows
+is a 0% diff, which would read as "your change did nothing" when the truth is
+that nothing was measured.
 
 A large result is capped (`rowLimit` in `.datadiff.json`, default 500) before
 it is saved for `canvas` — a canvas embeds its data inline with no `fetch`,
